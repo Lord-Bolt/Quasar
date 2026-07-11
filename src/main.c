@@ -68,8 +68,8 @@ int main(int argc, char **argv)
         fclose(cfile);
 
         printf("\nCompiling & running debug test...\n");
-        system("gcc -Wall -Wextra -std=c99 build/__temp_qs_output.c -o build/__temp_test.exe");
-        system("build/__temp_test.exe");
+        system("gcc -Wall -Wextra -std=c99 build\\__temp_qs_output.c -o build\\__temp_test.exe");
+        system("build\\__temp_test.exe");
 
         free_ast(ast);
         return 0;

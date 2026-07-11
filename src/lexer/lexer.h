@@ -7,6 +7,7 @@ typedef enum
     QTOKEN_LPAREN,
     QTOKEN_RPAREN,
     QTOKEN_INTEGER,
+    QTOKEN_STRING,
     QTOKEN_SEMICOLON,
     QTOKEN_EOF,
     QTOKEN_UNKNOWN
@@ -16,6 +17,7 @@ typedef struct
 {
     QTokenType type;
     int value;
+    char *str;
 } Token;
 
 Token get_next_token(const char *source, int *pos);

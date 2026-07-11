@@ -43,6 +43,14 @@ static ASTNode *parse_expression(void)
         advance();
         return make_integer(val);
     }
+    else if (g_current.type == QTOKEN_STRING)
+    {
+        char *str = g_current.str; // take ownership
+        advance();                 // consume token
+        ASTNode *node = make_string(str);
+        free(str); // since make_string already strdup'd it
+        return node;
+    }
     fprintf(stderr, "Expected expression, got token type %d\n", g_current.type);
     exit(1);
 }
@@ -74,11 +82,25 @@ ASTNode *parse_program(const char *source)
 {
     g_source = source;
     g_pos = 0;
-    advance(); // load 1st token
-    ASTNode *stmt = parse_statement();
-    if (g_current.type != QTOKEN_EOF)
+    advance();
+
+    ASTNode *program = make_program();
+
+    while (g_current.type != QTOKEN_EOF)
     {
-        fprintf(stderr, "Warning: extra tokens after statement\n");
+        // Skip any unknown tokens (e.g., stray bytes at end of file)
+        if (g_current.type == QTOKEN_UNKNOWN)
+        {
+            advance();
+            continue;
+        }
+        ASTNode *stmt = parse_statement();
+        if (!stmt)
+        {
+            free_ast(program);
+            return NULL;
+        }
+        program_add_statement(program, stmt);
     }
-    return stmt;
+    return program;
 }

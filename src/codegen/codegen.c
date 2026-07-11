@@ -15,10 +15,18 @@ static void indent(FILE *out, int level)
 
 void generate_code(ASTNode *program, FILE *out)
 {
-    fprintf(out, "#include <stdio.h>\n");
+    if (program->type != AST_PROGRAM)
+    {
+        fprintf(stderr, "Error: root node must be AST_PROGRAM\n");
+        exit(1);
+    }
+    fprintf(out, "#include <stdio.h>\n\n");
     fprintf(out, "int main(void) {\n");
-    emit_statement(program, out, 1);
-    fprintf(out, "  return 0;\n");
+    for (int i = 0; i < program->data.program.count; i++)
+    {
+        emit_statement(program->data.program.statements[i], out, 1);
+    }
+    fprintf(out, "    return 0;\n");
     fprintf(out, "}\n");
 }
 
@@ -31,13 +39,26 @@ static void emit_statement(ASTNode *node, FILE *out, int indent_level)
     switch (node->type)
     {
     case AST_PRINT:
-        // print( <expr> ) → printf("%d\n", <expr>);
-        // For integers: %d, later we'll check expression type for %s, etc.
+    {
         indent(out, indent_level);
-        fprintf(out, "printf(\"%%d\\n\", "); // emit expr recursively
-        emit_expression(node->data.expr, out);
+        ASTNode *expr = node->data.expr;
+        if (expr->type == AST_INTEGER)
+        {
+            fprintf(out, "printf(\"%%d\\n\", ");
+        }
+        else if (expr->type == AST_STRING)
+        {
+            fprintf(out, "printf(\"%%s\\n\", ");
+        }
+        else
+        {
+            fprintf(stderr, "Unknown expression type in print\n");
+            exit(1);
+        }
+        emit_expression(expr, out);
         fprintf(out, ");\n");
         break;
+    }
 
     default:
         fprintf(stderr, "Error : unknown statement type %d\n", node->type);
@@ -47,15 +68,57 @@ static void emit_statement(ASTNode *node, FILE *out, int indent_level)
 
 static void emit_expression(ASTNode *node, FILE *out)
 {
-    if (node == NULL)
-        return;
     switch (node->type)
     {
     case AST_INTEGER:
         fprintf(out, "%d", node->data.intValue);
         break;
+    case AST_STRING:
+    {
+        fputc('"', out);
+        for (char *p = node->data.strValue; *p; p++)
+        {
+            switch (*p)
+            {
+            case '\n':
+                fputs("\\n", out);
+                break;
+            case '\t':
+                fputs("\\t", out);
+                break;
+            case '\r':
+                fputs("\\r", out);
+                break;
+            case '\\':
+                fputs("\\\\", out);
+                break;
+            case '"':
+                fputs("\\\"", out);
+                break;
+            case '\0':
+                fputs("\\0", out);
+                break; // null character
+            case '\a':
+                fputs("\\a", out);
+                break; // alert (bell)
+            case '\b':
+                fputs("\\b", out);
+                break; // backspace
+            case '\f':
+                fputs("\\f", out);
+                break; // form feed
+            case '\v':
+                fputs("\\v", out);
+                break; // vertical tab
+            default:
+                fputc(*p, out);
+                break;
+            }
+        }
+        fputc('"', out);
+        break;
+    }
     default:
-        fprintf(stderr, "Error: unknown expression type %d\n", node->type);
-        exit(1);
+        break;
     }
 }
