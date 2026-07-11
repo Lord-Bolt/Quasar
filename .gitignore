@@ -3,3 +3,5 @@
 *.qsc
 *.qsr
 build/
+executables/
+examples/
