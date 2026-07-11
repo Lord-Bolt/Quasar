@@ -2,6 +2,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 // Helper: check if a word is a keyword (for now, just "print").
 static QTokenType check_keyword(const char *word)
@@ -12,11 +13,6 @@ static QTokenType check_keyword(const char *word)
     return QTOKEN_UNKNOWN; // not a keyword, maybe an identifier later
 }
 
-// Processes escape sequences in a string literal.
-// src: the source code starting at the opening quote.
-// pos: current position (should be just after the opening quote).
-// Returns a newly allocated string with escapes translated, and advances *pos past the closing quote.
-// On error (unterminated string), returns NULL.
 static char *read_string(const char *src, int *pos)
 {
     size_t cap = 64;
@@ -113,7 +109,7 @@ Token get_next_token(const char *source, int *pos)
     // EOF
     if (current == '\0')
     {
-        Token t = {QTOKEN_EOF, 0, NULL};
+        Token t = {.type = QTOKEN_EOF, .value = 0, .str = NULL};
         return t;
     }
 
@@ -133,7 +129,7 @@ Token get_next_token(const char *source, int *pos)
         QTokenType type = check_keyword(word);
         free(word);
 
-        Token t = {type, 0, NULL};
+        Token t = {.type = type, .value = 0, .str = NULL};
         if (type == QTOKEN_UNKNOWN)
         {
             // Could be an identifier in the future, but for now it's unknown.
@@ -142,10 +138,15 @@ Token get_next_token(const char *source, int *pos)
     }
 
     // Digits – integer literal
-    if (isdigit(current))
+    // --- Number (integer or float) ---
+    if (isdigit(current) || (current == '.' && isdigit(source[*pos + 1])))
     {
         int start = *pos;
-        while (isdigit(source[*pos]))
+        // Scan forward while the character belongs to the number
+        while (isdigit(source[*pos]) || source[*pos] == '.' ||
+               source[*pos] == 'e' || source[*pos] == 'E' ||
+               ((source[*pos] == '+' || source[*pos] == '-') &&
+                (source[*pos - 1] == 'e' || source[*pos - 1] == 'E')))
         {
             (*pos)++;
         }
@@ -153,10 +154,38 @@ Token get_next_token(const char *source, int *pos)
         char *num_str = (char *)malloc(length + 1);
         strncpy(num_str, &source[start], length);
         num_str[length] = '\0';
-        int value = atoi(num_str);
-        free(num_str);
 
-        Token t = {QTOKEN_INTEGER, value, NULL};
+        // Determine if it's a float (contains '.' or 'e'/'E')
+        bool is_float = false;
+        for (int i = 0; i < length; i++)
+        {
+            if (num_str[i] == '.' || num_str[i] == 'e' || num_str[i] == 'E')
+            {
+                is_float = true;
+                break;
+            }
+        }
+
+        Token t;
+        if (is_float)
+        {
+            char *endptr;
+            t.type = QTOKEN_FLOAT;
+            t.floatValue = strtod(num_str, &endptr);
+            if (endptr == num_str)
+            {
+                // conversion failed, treat as unknown
+                t.type = QTOKEN_UNKNOWN;
+                t.floatValue = 0.0;
+            }
+        }
+        else
+        {
+            t.type = QTOKEN_INTEGER;
+            t.value = atoi(num_str);
+        }
+        t.str = NULL;
+        free(num_str);
         return t;
     }
 
@@ -167,10 +196,10 @@ Token get_next_token(const char *source, int *pos)
         char *str = read_string(source, pos);
         if (str == NULL)
         {
-            Token t = {QTOKEN_UNKNOWN, 0, NULL};
+            Token t = {.type = QTOKEN_UNKNOWN, .value = 0, .str = NULL};
             return t;
         }
-        Token t = {QTOKEN_STRING, 0, str};
+        Token t = {.type = QTOKEN_STRING, .value = 0, .str = str};
         return t;
     }
 
@@ -180,25 +209,25 @@ Token get_next_token(const char *source, int *pos)
     case '(':
         (*pos)++;
         {
-            Token t = {QTOKEN_LPAREN, 0, NULL};
+            Token t = {.type = QTOKEN_LPAREN, .value = 0, .str = NULL};
             return t;
         }
     case ')':
         (*pos)++;
         {
-            Token t = {QTOKEN_RPAREN, 0, NULL};
+            Token t = {.type = QTOKEN_RPAREN, .value = 0, .str = NULL};
             return t;
         }
     case ';':
         (*pos)++;
         {
-            Token t = {QTOKEN_SEMICOLON, 0, NULL};
+            Token t = {.type = QTOKEN_SEMICOLON, .value = 0, .str = NULL};
             return t;
         }
     }
 
     // Unknown char
-    Token t = {QTOKEN_UNKNOWN, 0, NULL};
+    Token t = {.type = QTOKEN_UNKNOWN, .value = 0, .str = NULL};
     (*pos)++;
     return t;
 }

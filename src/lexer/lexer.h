@@ -7,6 +7,7 @@ typedef enum
     QTOKEN_LPAREN,
     QTOKEN_RPAREN,
     QTOKEN_INTEGER,
+    QTOKEN_FLOAT,
     QTOKEN_STRING,
     QTOKEN_SEMICOLON,
     QTOKEN_EOF,
@@ -17,6 +18,7 @@ typedef struct
 {
     QTokenType type;
     int value;
+    double floatValue;
     char *str;
 } Token;
 

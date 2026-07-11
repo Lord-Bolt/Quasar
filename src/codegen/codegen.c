@@ -46,6 +46,10 @@ static void emit_statement(ASTNode *node, FILE *out, int indent_level)
         {
             fprintf(out, "printf(\"%%d\\n\", ");
         }
+        else if (expr->type == AST_FLOAT)
+        {
+            fprintf(out, "printf(\"%%g\\n\", ");
+        }
         else if (expr->type == AST_STRING)
         {
             fprintf(out, "printf(\"%%s\\n\", ");
@@ -72,6 +76,9 @@ static void emit_expression(ASTNode *node, FILE *out)
     {
     case AST_INTEGER:
         fprintf(out, "%d", node->data.intValue);
+        break;
+    case AST_FLOAT:
+        fprintf(out, "%f", node->data.floatValue);
         break;
     case AST_STRING:
     {

@@ -43,6 +43,12 @@ static ASTNode *parse_expression(void)
         advance();
         return make_integer(val);
     }
+    else if (g_current.type == QTOKEN_FLOAT)
+    {
+        double val = g_current.floatValue;
+        advance();
+        return make_float(val);
+    }
     else if (g_current.type == QTOKEN_STRING)
     {
         char *str = g_current.str; // take ownership

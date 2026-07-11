@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+// For int
 ASTNode *make_integer(int value)
 {
     ASTNode *node = (ASTNode *)malloc(sizeof(ASTNode));
@@ -13,6 +14,18 @@ ASTNode *make_integer(int value)
     return node;
 }
 
+// For Float
+ASTNode *make_float(double value)
+{
+    ASTNode *node = malloc(sizeof(ASTNode));
+    if (!node)
+        return NULL;
+    node->type = AST_FLOAT;
+    node->data.floatValue = value;
+    return node;
+}
+
+// For print stmt
 ASTNode *make_print(ASTNode *expr)
 {
     ASTNode *node = (ASTNode *)malloc(sizeof(ASTNode));
@@ -23,6 +36,7 @@ ASTNode *make_print(ASTNode *expr)
     return node;
 }
 
+// For string
 ASTNode *make_string(const char *value)
 {
     ASTNode *node = malloc(sizeof(ASTNode));
@@ -32,6 +46,8 @@ ASTNode *make_string(const char *value)
     node->data.strValue = strdup(value);
     return node;
 }
+
+// For .qs
 ASTNode *make_program(void)
 {
     ASTNode *node = malloc(sizeof(ASTNode));
@@ -80,6 +96,10 @@ void free_ast(ASTNode *node)
         for (int i = 0; i < node->data.program.count; i++)
             free_ast(node->data.program.statements[i]);
         free(node->data.program.statements);
+        break;
+    case AST_INTEGER:
+    case AST_FLOAT:
+        // nothing to free
         break;
     default:
         break;
