@@ -171,15 +171,6 @@ Token get_next_token(const char *source, int *pos)
                 (*pos)++;
         }
 
-        // If we stopped on a character that is not a delimiter, the number is malformed
-        if (valid && (isalnum(source[*pos]) || source[*pos] == '.' || source[*pos] == '+' || source[*pos] == '-'))
-        {
-            valid = false;
-            // consume the rest of the garbage so we don't leave it for the parser
-            while (isalnum(source[*pos]) || source[*pos] == '.' || source[*pos] == '+' || source[*pos] == '-')
-                (*pos)++;
-        }
-
         int length = *pos - start;
         char *num_str = malloc(length + 1);
         strncpy(num_str, &source[start], length);
