@@ -94,11 +94,16 @@ int main(int argc, char **argv)
         {
             if (i + 1 < argc)
             {
-                output_file = argv[++i];
+                output_file = strdup(argv[++i]); // copy to heap
+                if (!output_file)
+                {
+                    fprintf(stderr, "Memory error\n");
+                    return 1;
+                }
             }
             else
             {
-                fprintf(stderr, "E`rror: -o requires an argument\n");
+                fprintf(stderr, "Error: -o requires an argument\n");
                 return 1;
             }
         }
@@ -150,14 +155,14 @@ int main(int argc, char **argv)
             *dot = '\0';
         // Build final path: executables/<name>.exe
         ensure_directory("executables");
-        output_file = malloc(strlen(temp) + 15); // enough for "executables/" + ".exe"
+        output_file = malloc(strlen(temp) + 20);
         if (!output_file)
         {
             free(temp);
             fprintf(stderr, "Memory error\n");
             return 1;
         }
-        sprintf(output_file, "executables/%s.exe", temp);
+        sprintf(output_file, "executables\\%s.exe", temp);
         free(temp);
     }
 
@@ -203,8 +208,8 @@ int main(int argc, char **argv)
     generate_code(ast, cfile);
     fclose(cfile);
 
-    char cmd[512];
-    snprintf(cmd, sizeof(cmd), "gcc -Wall -Wextra -std=c99 build/__temp_qs_output.c -o %s", output_file);
+    char cmd[2048];
+    snprintf(cmd, sizeof(cmd), "gcc -Wall -Wextra -std=c99 build\\__temp_qs_output.c -o %s", output_file);
     int rc = system(cmd);
     if (rc != 0)
     {
@@ -215,5 +220,6 @@ int main(int argc, char **argv)
 
     printf("Quasar: compiled '%s' -> '%s'\n", source_file, output_file);
     free_ast(ast);
+    free(output_file);
     return 0;
 }

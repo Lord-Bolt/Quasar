@@ -31,6 +31,15 @@ const char *token_name(QTokenType type)
     }
 }
 
+static void free_token_string(Token *token)
+{
+    if (token->str)
+    {
+        free(token->str);
+        token->str = NULL;
+    }
+}
+
 // --- Lexer interface ---
 static const char *g_source;
 static int g_pos;
@@ -142,6 +151,7 @@ ASTNode *parse_program(const char *source)
         // Skip stray unknown tokens
         if (g_current.type == QTOKEN_UNKNOWN)
         {
+            free_token_string(&g_current);
             advance();
             continue;
         }
@@ -159,6 +169,7 @@ ASTNode *parse_program(const char *source)
             // Go to the start of the next statement (after the next semicolon)
             while (g_current.type != QTOKEN_SEMICOLON && g_current.type != QTOKEN_EOF)
             {
+                free_token_string(&g_current);
                 advance();
             }
             if (g_current.type == QTOKEN_SEMICOLON)
