@@ -142,47 +142,75 @@ Token get_next_token(const char *source, int *pos)
     if (isdigit(current) || (current == '.' && isdigit(source[*pos + 1])))
     {
         int start = *pos;
-        // Scan forward while the character belongs to the number
-        while (isdigit(source[*pos]) || source[*pos] == '.' ||
-               source[*pos] == 'e' || source[*pos] == 'E' ||
-               ((source[*pos] == '+' || source[*pos] == '-') &&
-                (source[*pos - 1] == 'e' || source[*pos - 1] == 'E')))
+        bool has_dot = false;
+        bool has_exp = false;
+        bool valid = true;
+
+        // State 0: integer part (digits, optional leading dot)
+        while (isdigit(source[*pos]) || (source[*pos] == '.' && !has_dot && !has_exp))
         {
+            if (source[*pos] == '.')
+                has_dot = true;
             (*pos)++;
         }
+
+        // State 1: exponent part (optional)
+        if (source[*pos] == 'e' || source[*pos] == 'E')
+        {
+            has_exp = true;
+            (*pos)++;
+            // optional sign
+            if (source[*pos] == '+' || source[*pos] == '-')
+                (*pos)++;
+            // must have at least one digit
+            if (!isdigit(source[*pos]))
+            {
+                valid = false; // exponent without digits
+            }
+            while (isdigit(source[*pos]))
+                (*pos)++;
+        }
+
+        // If we stopped on a character that is not a delimiter, the number is malformed
+        if (valid && (isalnum(source[*pos]) || source[*pos] == '.' || source[*pos] == '+' || source[*pos] == '-'))
+        {
+            valid = false;
+            // consume the rest of the garbage so we don't leave it for the parser
+            while (isalnum(source[*pos]) || source[*pos] == '.' || source[*pos] == '+' || source[*pos] == '-')
+                (*pos)++;
+        }
+
         int length = *pos - start;
-        char *num_str = (char *)malloc(length + 1);
+        char *num_str = malloc(length + 1);
         strncpy(num_str, &source[start], length);
         num_str[length] = '\0';
 
-        // Determine if it's a float (contains '.' or 'e'/'E')
-        bool is_float = false;
-        for (int i = 0; i < length; i++)
-        {
-            if (num_str[i] == '.' || num_str[i] == 'e' || num_str[i] == 'E')
-            {
-                is_float = true;
-                break;
-            }
-        }
-
         Token t;
-        if (is_float)
+        if (!valid)
         {
-            char *endptr;
-            t.type = QTOKEN_FLOAT;
-            t.floatValue = strtod(num_str, &endptr);
-            if (endptr == num_str)
-            {
-                // conversion failed, treat as unknown
-                t.type = QTOKEN_UNKNOWN;
-                t.floatValue = 0.0;
-            }
+            t.type = QTOKEN_UNKNOWN;
+            t.value = 0;
+            t.floatValue = 0.0;
         }
         else
         {
-            t.type = QTOKEN_INTEGER;
-            t.value = atoi(num_str);
+            if (has_dot || has_exp)
+            {
+                char *endptr;
+                t.type = QTOKEN_FLOAT;
+                t.floatValue = strtod(num_str, &endptr);
+                if (endptr == num_str)
+                {
+                    t.type = QTOKEN_UNKNOWN;
+                    t.floatValue = 0.0;
+                }
+            }
+            else
+            {
+                t.type = QTOKEN_INTEGER;
+                t.value = atoi(num_str);
+                t.floatValue = 0.0;
+            }
         }
         t.str = NULL;
         free(num_str);
