@@ -58,6 +58,10 @@ static void emit_statement(ASTNode *node, FILE *out, int indent_level)
         {
             fprintf(out, "printf(\"%%c\\n\", ");
         }
+        else if (expr->type == AST_BOOL)
+        {
+            fprintf(out, "printf(\"%%d\\n\", ");
+        }
         else
         {
             fprintf(stderr, "Unknown expression type in print\n");
@@ -173,6 +177,9 @@ static void emit_expression(ASTNode *node, FILE *out)
         fputc('\'', out);
         break;
     }
+    case AST_BOOL:
+        fprintf(out, "%d", node->data.boolValue);
+        break;
     default:
         break;
     }

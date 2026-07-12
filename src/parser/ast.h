@@ -8,6 +8,7 @@ typedef enum
     AST_PRINT,
     AST_STRING,
     AST_CHAR,
+    AST_BOOL,
     AST_PROGRAM
 } ASTNodeType;
 
@@ -20,6 +21,7 @@ typedef struct ASTNode
         double floatValue;
         char *strValue;
         char charValue;
+        int boolValue;
         struct ASTNode *expr; // for AST_PRINT
         struct
         {
@@ -36,6 +38,7 @@ ASTNode *make_string(const char *value);
 ASTNode *make_program(void);
 ASTNode *make_float(double value);
 ASTNode *make_char(char value);
+ASTNode *make_bool(int value);
 
 void program_add_statement(ASTNode *program, ASTNode *stmt); // adds a child to the program
 void free_ast(ASTNode *node);

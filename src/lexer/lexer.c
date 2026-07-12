@@ -9,6 +9,10 @@ static QTokenType check_keyword(const char *word)
 {
     if (strcmp(word, "print") == 0)
         return QTOKEN_PRINT;
+    if (strcmp(word, "true") == 0)
+        return QTOKEN_TRUE;
+    if (strcmp(word, "false") == 0)
+        return QTOKEN_FALSE;
     // In future: else if (strcmp(word, "let") == 0) return TOKEN_LET; etc.
     return QTOKEN_UNKNOWN; // not a keyword, maybe an identifier later
 }
