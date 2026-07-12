@@ -97,6 +97,74 @@ static char *read_string(const char *src, int *pos)
     return buffer;
 }
 
+// Reads a single character literal (including escape sequences).
+// src: source code, pos: pointer to current position (should be at the opening quote).
+// Returns the decoded character, or -1 on error (unterminated, empty, etc.).
+// Advances *pos past the closing quote.
+static int read_char(const char *src, int *pos)
+{
+    (*pos)++; // skip opening quote
+    if (src[*pos] == '\0')
+        return -1; // unterminated
+
+    int ch = 0;
+    if (src[*pos] == '\\')
+    {
+        // escape sequence
+        (*pos)++; // skip backslash
+        if (src[*pos] == '\0')
+            return -1;
+        switch (src[*pos])
+        {
+        case 'n':
+            ch = '\n';
+            break;
+        case 't':
+            ch = '\t';
+            break;
+        case 'r':
+            ch = '\r';
+            break;
+        case '\\':
+            ch = '\\';
+            break;
+        case '\'':
+            ch = '\'';
+            break;
+        case '0':
+            ch = '\0';
+            break;
+        case 'a':
+            ch = '\a';
+            break;
+        case 'b':
+            ch = '\b';
+            break;
+        case 'f':
+            ch = '\f';
+            break;
+        case 'v':
+            ch = '\v';
+            break;
+        default:
+            ch = src[*pos];
+            break; // unrecognized escape, keep the char
+        }
+    }
+    else
+    {
+        ch = src[*pos];
+    }
+    (*pos)++;
+    if (src[*pos] != '\'')
+    {
+        // missing closing quote
+        return -1;
+    }
+    (*pos)++; // skip closing quote
+    return ch;
+}
+
 Token get_next_token(const char *source, int *pos)
 {
     // Skip Whitespace
@@ -219,6 +287,19 @@ Token get_next_token(const char *source, int *pos)
             return t;
         }
         Token t = {.type = QTOKEN_STRING, .value = 0, .str = str};
+        return t;
+    }
+
+    // Character literal
+    if (current == '\'')
+    {
+        int ch = read_char(source, pos);
+        if (ch == -1)
+        {
+            Token t = {.type = QTOKEN_UNKNOWN, .value = 0, .str = NULL};
+            return t;
+        }
+        Token t = {.type = QTOKEN_CHAR, .value = ch, .str = NULL};
         return t;
     }
 

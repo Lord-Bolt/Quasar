@@ -47,6 +47,17 @@ ASTNode *make_string(const char *value)
     return node;
 }
 
+// For single chars
+ASTNode *make_char(char value)
+{
+    ASTNode *node = malloc(sizeof(ASTNode));
+    if (!node)
+        return NULL;
+    node->type = AST_CHAR;
+    node->data.charValue = value;
+    return node;
+}
+
 // For .qs
 ASTNode *make_program(void)
 {

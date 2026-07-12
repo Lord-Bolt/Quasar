@@ -54,6 +54,10 @@ static void emit_statement(ASTNode *node, FILE *out, int indent_level)
         {
             fprintf(out, "printf(\"%%s\\n\", ");
         }
+        else if (expr->type == AST_CHAR)
+        {
+            fprintf(out, "printf(\"%%c\\n\", ");
+        }
         else
         {
             fprintf(stderr, "Unknown expression type in print\n");
@@ -123,6 +127,50 @@ static void emit_expression(ASTNode *node, FILE *out)
             }
         }
         fputc('"', out);
+        break;
+    }
+    case AST_CHAR:
+    {
+        // Emit as a C char literal, escaping if needed
+        fputc('\'', out);
+        char c = node->data.charValue;
+        switch (c)
+        {
+        case '\n':
+            fputs("\\n", out);
+            break;
+        case '\t':
+            fputs("\\t", out);
+            break;
+        case '\r':
+            fputs("\\r", out);
+            break;
+        case '\\':
+            fputs("\\\\", out);
+            break;
+        case '\'':
+            fputs("\\'", out);
+            break;
+        case '\0':
+            fputs("\\0", out);
+            break;
+        case '\a':
+            fputs("\\a", out);
+            break;
+        case '\b':
+            fputs("\\b", out);
+            break;
+        case '\f':
+            fputs("\\f", out);
+            break;
+        case '\v':
+            fputs("\\v", out);
+            break;
+        default:
+            fputc(c, out);
+            break;
+        }
+        fputc('\'', out);
         break;
     }
     default:

@@ -97,7 +97,14 @@ static ASTNode *parse_expression(void)
         free(str); // since make_string already strdup'd it
         return node;
     }
-    // Replace the old error line with:
+
+    else if (g_current.type == QTOKEN_CHAR)
+    {
+        char val = (char)g_current.value; // value holds the decoded character
+        advance();
+        return make_char(val);
+    }
+
     fprintf(stderr, "Parser error: expected expression, but got %s\n",
             token_name(g_current.type));
     return NULL;
