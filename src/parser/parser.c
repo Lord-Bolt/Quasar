@@ -1,8 +1,30 @@
+#define _POSIX_C_SOURCE 200809L
 #include "parser/parser.h"
 #include "lexer/lexer.h"
+#include "symtab/symtab.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <string.h>
+
+static VarType token_to_vartype(QTokenType type)
+{
+    switch (type)
+    {
+    case QTOKEN_TYPE_INT:
+        return TYPE_INT;
+    case QTOKEN_TYPE_FLOAT:
+        return TYPE_FLOAT;
+    case QTOKEN_TYPE_STRING:
+        return TYPE_STRING;
+    case QTOKEN_TYPE_CHAR:
+        return TYPE_CHAR;
+    case QTOKEN_TYPE_BOOL:
+        return TYPE_BOOL;
+    default:
+        return TYPE_INT; // error, but keep going
+    }
+}
 
 const char *token_name(QTokenType type)
 {
@@ -22,6 +44,24 @@ const char *token_name(QTokenType type)
         return "string literal";
     case QTOKEN_SEMICOLON:
         return "';'";
+    case QTOKEN_LET:
+        return "'let'";
+    case QTOKEN_COLON:
+        return "':'";
+    case QTOKEN_EQUALS:
+        return "'='";
+    case QTOKEN_IDENTIFIER:
+        return "identifier";
+    case QTOKEN_TYPE_INT:
+        return "'int'";
+    case QTOKEN_TYPE_FLOAT:
+        return "'float'";
+    case QTOKEN_TYPE_STRING:
+        return "'string'";
+    case QTOKEN_TYPE_CHAR:
+        return "'char'";
+    case QTOKEN_TYPE_BOOL:
+        return "'bool'";
     case QTOKEN_EOF:
         return "end of file";
     case QTOKEN_UNKNOWN:
@@ -103,6 +143,13 @@ static ASTNode *parse_expression(void)
         advance();
         return make_char(val);
     }
+    else if (g_current.type == QTOKEN_IDENTIFIER)
+    {
+        char *name = strdup(g_current.str); // duplicate for AST
+        advance();
+        // symtab_lookup could be used later for type checking
+        return make_variable(name);
+    }
     else if (g_current.type == QTOKEN_TRUE)
     {
         advance();
@@ -171,13 +218,75 @@ static ASTNode *parse_print_statement(void)
     return print_node;
 }
 
+static ASTNode *parse_let_statement(void)
+{
+    advance(); // consume 'let'
+
+    // Expect variable name (identifier)
+    if (g_current.type != QTOKEN_IDENTIFIER)
+    {
+        fprintf(stderr, "Expected variable name after 'let'\n");
+        return NULL;
+    }
+    char *name = strdup(g_current.str); // make a copy for the AST
+    advance();                          // consume identifier
+
+    if (!expect(QTOKEN_COLON, "expected ':' after variable name"))
+    {
+        free(name);
+        return NULL;
+    }
+
+    // Expect a type keyword (int, float, string, char, bool)
+    VarType type;
+    if (g_current.type == QTOKEN_TYPE_INT || g_current.type == QTOKEN_TYPE_FLOAT ||
+        g_current.type == QTOKEN_TYPE_STRING || g_current.type == QTOKEN_TYPE_CHAR ||
+        g_current.type == QTOKEN_TYPE_BOOL)
+    {
+        type = token_to_vartype(g_current.type);
+        advance();
+    }
+    else
+    {
+        fprintf(stderr, "Expected type after ':' in let statement\n");
+        free(name);
+        return NULL;
+    }
+
+    if (!expect(QTOKEN_EQUALS, "expected '=' in let statement"))
+    {
+        free(name);
+        return NULL;
+    }
+
+    ASTNode *init = parse_expression();
+    if (!init)
+    {
+        free(name);
+        return NULL;
+    }
+
+    if (!expect(QTOKEN_SEMICOLON, "expected ';' after let statement"))
+    {
+        free_ast(init);
+        free(name);
+        return NULL;
+    }
+
+    // Register in symbol table
+    symtab_add(name, type);
+
+    return make_let(name, type, init);
+}
+
 static ASTNode *parse_statement(void)
 {
     switch (g_current.type)
     {
     case QTOKEN_PRINT:
         return parse_print_statement();
-    // TODO: case QTOKEN_LET: ...
+    case QTOKEN_LET:
+        return parse_let_statement();
     default:
         fprintf(stderr, "Parser error: unexpected token %s at start of statement\n",
                 token_name(g_current.type));

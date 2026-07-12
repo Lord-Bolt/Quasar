@@ -1,5 +1,6 @@
 #ifndef AST_H
 #define AST_H
+#include "symtab/symtab.h"
 
 typedef enum
 {
@@ -9,6 +10,8 @@ typedef enum
     AST_STRING,
     AST_CHAR,
     AST_BOOL,
+    AST_LET,
+    AST_VARIABLE,
     AST_PROGRAM
 } ASTNodeType;
 
@@ -28,6 +31,15 @@ typedef struct ASTNode
             int count;
             int capacity;
         } print; // for AST_PRINT
+
+        struct
+        {
+            char *name;
+            VarType vartype;
+            struct ASTNode *init; // initializer expression
+        } let;                    // for AST_LET
+        char *varName;            // for AST_VARIABLE
+
         struct
         {
             struct ASTNode **statements; // for AST_PROGRAM
@@ -44,6 +56,8 @@ ASTNode *make_program(void);
 ASTNode *make_float(double value);
 ASTNode *make_char(char value);
 ASTNode *make_bool(int value);
+ASTNode *make_let(const char *name, VarType type, ASTNode *init);
+ASTNode *make_variable(const char *name);
 
 void print_add_expression(ASTNode *print_node, ASTNode *expr); // add an expression to the print node
 void program_add_statement(ASTNode *program, ASTNode *stmt);   // adds a child to the program

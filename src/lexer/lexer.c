@@ -13,7 +13,18 @@ static QTokenType check_keyword(const char *word)
         return QTOKEN_TRUE;
     if (strcmp(word, "false") == 0)
         return QTOKEN_FALSE;
-    // In future: else if (strcmp(word, "let") == 0) return TOKEN_LET; etc.
+    if (strcmp(word, "let") == 0)
+        return QTOKEN_LET;
+    if (strcmp(word, "int") == 0)
+        return QTOKEN_TYPE_INT;
+    if (strcmp(word, "float") == 0)
+        return QTOKEN_TYPE_FLOAT;
+    if (strcmp(word, "string") == 0)
+        return QTOKEN_TYPE_STRING;
+    if (strcmp(word, "char") == 0)
+        return QTOKEN_TYPE_CHAR;
+    if (strcmp(word, "bool") == 0)
+        return QTOKEN_TYPE_BOOL;
     return QTOKEN_UNKNOWN; // not a keyword, maybe an identifier later
 }
 
@@ -199,12 +210,19 @@ Token get_next_token(const char *source, int *pos)
         word[length] = '\0';
 
         QTokenType type = check_keyword(word);
-        free(word);
-
-        Token t = {.type = type, .value = 0, .str = NULL};
+        Token t;
+        t.value = 0;
         if (type == QTOKEN_UNKNOWN)
         {
-            // Could be an identifier in the future, but for now it's unknown.
+            // It's an identifier (variable name)
+            t.type = QTOKEN_IDENTIFIER;
+            t.str = word; // we take ownership of the malloc'd string
+        }
+        else
+        {
+            t.type = type;
+            t.str = NULL;
+            free(word);
         }
         return t;
     }
@@ -332,6 +350,18 @@ Token get_next_token(const char *source, int *pos)
         (*pos)++;
         {
             Token t = {.type = QTOKEN_COMMA, .value = 0, .str = NULL};
+            return t;
+        }
+    case ':':
+        (*pos)++;
+        {
+            Token t = {.type = QTOKEN_COLON, .value = 0, .str = NULL};
+            return t;
+        }
+    case '=':
+        (*pos)++;
+        {
+            Token t = {.type = QTOKEN_EQUALS, .value = 0, .str = NULL};
             return t;
         }
     }

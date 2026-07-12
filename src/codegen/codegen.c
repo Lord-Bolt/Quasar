@@ -1,4 +1,5 @@
 #include "codegen/codegen.h"
+#include "symtab/symtab.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -18,9 +19,12 @@ static const char *format_spec_for(ASTNode *node)
     case AST_CHAR:
         return "%c";
     case AST_BOOL:
-        return "%d"; // or "%s" for true/false later
+        return "%d";
+    case AST_VARIABLE:
+        // Look up the variable's type in the symbol table
+        return ctype_spec_string(symtab_lookup(node->data.varName));
     default:
-        return "???"; // error
+        return "???";
     }
 }
 
@@ -41,10 +45,33 @@ void generate_code(ASTNode *program, FILE *out)
     }
     fprintf(out, "#include <stdio.h>\n\n");
     fprintf(out, "int main(void) {\n");
+
+    // First pass: emit all variable declarations (AST_LET)
     for (int i = 0; i < program->data.program.count; i++)
     {
-        emit_statement(program->data.program.statements[i], out, 1);
+        ASTNode *stmt = program->data.program.statements[i];
+        if (stmt->type == AST_LET)
+        {
+            fprintf(out, "    %s %s", ctype_string(stmt->data.let.vartype), stmt->data.let.name);
+            if (stmt->data.let.init)
+            {
+                fprintf(out, " = ");
+                emit_expression(stmt->data.let.init, out);
+            }
+            fprintf(out, ";\n");
+        }
     }
+
+    // Second pass: emit all other statements (print, etc.)
+    for (int i = 0; i < program->data.program.count; i++)
+    {
+        ASTNode *stmt = program->data.program.statements[i];
+        if (stmt->type != AST_LET)
+        {
+            emit_statement(stmt, out, 1);
+        }
+    }
+
     fprintf(out, "    return 0;\n");
     fprintf(out, "}\n");
 }
@@ -87,6 +114,10 @@ static void emit_statement(ASTNode *node, FILE *out, int indent_level)
         fprintf(out, ");\n");
         break;
     }
+
+    case AST_LET:
+        // already handled in declarations
+        break;
 
     default:
         fprintf(stderr, "Error : unknown statement type %d\n", node->type);
@@ -195,6 +226,9 @@ static void emit_expression(ASTNode *node, FILE *out)
     }
     case AST_BOOL:
         fprintf(out, "%d", node->data.boolValue);
+        break;
+    case AST_VARIABLE:
+        fprintf(out, "%s", node->data.varName);
         break;
     default:
         break;

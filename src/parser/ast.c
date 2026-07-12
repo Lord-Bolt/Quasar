@@ -122,6 +122,29 @@ void program_add_statement(ASTNode *program, ASTNode *stmt)
     program->data.program.statements[program->data.program.count++] = stmt;
 }
 
+// for let and variable
+ASTNode *make_let(const char *name, VarType type, ASTNode *init)
+{
+    ASTNode *node = malloc(sizeof(ASTNode));
+    if (!node)
+        return NULL;
+    node->type = AST_LET;
+    node->data.let.name = strdup(name);
+    node->data.let.vartype = type;
+    node->data.let.init = init;
+    return node;
+}
+
+ASTNode *make_variable(const char *name)
+{
+    ASTNode *node = malloc(sizeof(ASTNode));
+    if (!node)
+        return NULL;
+    node->type = AST_VARIABLE;
+    node->data.varName = strdup(name);
+    return node;
+}
+
 // Update free_ast to handle AST_PROGRAM
 void free_ast(ASTNode *node)
 {
@@ -145,6 +168,13 @@ void free_ast(ASTNode *node)
     case AST_INTEGER:
     case AST_FLOAT:
         // nothing to free
+        break;
+    case AST_LET:
+        free(node->data.let.name);
+        free_ast(node->data.let.init);
+        break;
+    case AST_VARIABLE:
+        free(node->data.varName);
         break;
     default:
         break;
