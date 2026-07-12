@@ -122,22 +122,53 @@ static ASTNode *parse_expression(void)
 static ASTNode *parse_print_statement(void)
 {
     advance(); // consume 'print'
-    if (!expect(QTOKEN_LPAREN, "after 'print'"))
+    if (!expect(QTOKEN_LPAREN, "expected '(' after 'print'"))
         return NULL;
+
+    ASTNode *print_node = make_print_empty();
+
+    // Check for empty argument list (maybe just a newline, we'll treat as error)
+    if (g_current.type == QTOKEN_RPAREN)
+    {
+        fprintf(stderr, "Print statement requires at least one argument\n");
+        free_ast(print_node);
+        return NULL;
+    }
+
+    // Parse first expression
     ASTNode *expr = parse_expression();
     if (!expr)
-        return NULL; // <-- bail out immediately
-    if (!expect(QTOKEN_RPAREN, "after expression"))
     {
-        free_ast(expr); // clean up the expression
+        free_ast(print_node);
         return NULL;
     }
-    if (!expect(QTOKEN_SEMICOLON, "after print statement"))
+    print_add_expression(print_node, expr);
+
+    // Parse additional expressions separated by commas
+    while (g_current.type == QTOKEN_COMMA)
     {
-        free_ast(expr);
+        advance(); // consume comma
+        expr = parse_expression();
+        if (!expr)
+        {
+            free_ast(print_node);
+            return NULL;
+        }
+        print_add_expression(print_node, expr);
+    }
+
+    if (!expect(QTOKEN_RPAREN, "expected ')' after expression list"))
+    {
+        free_ast(print_node);
         return NULL;
     }
-    return make_print(expr);
+    // semicolon is optional? For now require it like before
+    if (!expect(QTOKEN_SEMICOLON, "expected ';' after print statement"))
+    {
+        free_ast(print_node);
+        return NULL;
+    }
+    return print_node;
 }
 
 static ASTNode *parse_statement(void)

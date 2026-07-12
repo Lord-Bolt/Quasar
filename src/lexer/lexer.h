@@ -13,6 +13,7 @@ typedef enum
     QTOKEN_TRUE,
     QTOKEN_FALSE,
     QTOKEN_SEMICOLON,
+    QTOKEN_COMMA,
     QTOKEN_EOF,
     QTOKEN_UNKNOWN
 } QTokenType;

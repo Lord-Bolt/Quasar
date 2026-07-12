@@ -328,6 +328,12 @@ Token get_next_token(const char *source, int *pos)
             Token t = {.type = QTOKEN_SEMICOLON, .value = 0, .str = NULL};
             return t;
         }
+    case ',':
+        (*pos)++;
+        {
+            Token t = {.type = QTOKEN_COMMA, .value = 0, .str = NULL};
+            return t;
+        }
     }
 
     // Unknown char

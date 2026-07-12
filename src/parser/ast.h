@@ -22,25 +22,31 @@ typedef struct ASTNode
         char *strValue;
         char charValue;
         int boolValue;
-        struct ASTNode *expr; // for AST_PRINT
         struct
         {
-            struct ASTNode **statements; // array of statement ASTNode*
+            struct ASTNode **expressions; // array of expression nodes
             int count;
             int capacity;
-        } program; // for AST_PROGRAM
+        } print; // for AST_PRINT
+        struct
+        {
+            struct ASTNode **statements; // for AST_PROGRAM
+            int count;
+            int capacity;
+        } program;
     } data;
 } ASTNode;
 
 ASTNode *make_integer(int value);
-ASTNode *make_print(ASTNode *expr);
+ASTNode *make_print_empty(void); // create empty print node
 ASTNode *make_string(const char *value);
 ASTNode *make_program(void);
 ASTNode *make_float(double value);
 ASTNode *make_char(char value);
 ASTNode *make_bool(int value);
 
-void program_add_statement(ASTNode *program, ASTNode *stmt); // adds a child to the program
+void print_add_expression(ASTNode *print_node, ASTNode *expr); // add an expression to the print node
+void program_add_statement(ASTNode *program, ASTNode *stmt);   // adds a child to the program
 void free_ast(ASTNode *node);
 
 #endif

@@ -5,6 +5,25 @@
 static void emit_statement(ASTNode *node, FILE *out, int indent);
 static void emit_expression(ASTNode *node, FILE *out);
 
+static const char *format_spec_for(ASTNode *node)
+{
+    switch (node->type)
+    {
+    case AST_INTEGER:
+        return "%d";
+    case AST_FLOAT:
+        return "%g";
+    case AST_STRING:
+        return "%s";
+    case AST_CHAR:
+        return "%c";
+    case AST_BOOL:
+        return "%d"; // or "%s" for true/false later
+    default:
+        return "???"; // error
+    }
+}
+
 static void indent(FILE *out, int level)
 {
     for (int i = 0; i < level; i++)
@@ -41,33 +60,30 @@ static void emit_statement(ASTNode *node, FILE *out, int indent_level)
     case AST_PRINT:
     {
         indent(out, indent_level);
-        ASTNode *expr = node->data.expr;
-        if (expr->type == AST_INTEGER)
+        // Build format string and argument list
+        int n = node->data.print.count;
+        if (n == 0)
         {
-            fprintf(out, "printf(\"%%d\\n\", ");
+            fprintf(out, "printf(\"\\n\");\n"); // just a newline
+            break;
         }
-        else if (expr->type == AST_FLOAT)
+
+        // write the format string with separators (space) between args, then newline
+        fprintf(out, "printf(\"");
+        for (int i = 0; i < n; i++)
         {
-            fprintf(out, "printf(\"%%g\\n\", ");
+            fprintf(out, "%s", format_spec_for(node->data.print.expressions[i]));
+            if (i < n - 1)
+                fprintf(out, " "); // optional space between arguments
         }
-        else if (expr->type == AST_STRING)
+        fprintf(out, "\\n\"");
+
+        // Now the arguments
+        for (int i = 0; i < n; i++)
         {
-            fprintf(out, "printf(\"%%s\\n\", ");
+            fprintf(out, ", ");
+            emit_expression(node->data.print.expressions[i], out);
         }
-        else if (expr->type == AST_CHAR)
-        {
-            fprintf(out, "printf(\"%%c\\n\", ");
-        }
-        else if (expr->type == AST_BOOL)
-        {
-            fprintf(out, "printf(\"%%d\\n\", ");
-        }
-        else
-        {
-            fprintf(stderr, "Unknown expression type in print\n");
-            exit(1);
-        }
-        emit_expression(expr, out);
         fprintf(out, ");\n");
         break;
     }

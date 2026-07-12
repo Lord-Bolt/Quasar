@@ -26,14 +26,35 @@ ASTNode *make_float(double value)
 }
 
 // For print stmt
-ASTNode *make_print(ASTNode *expr)
+ASTNode *make_print_empty(void)
 {
-    ASTNode *node = (ASTNode *)malloc(sizeof(ASTNode));
+    ASTNode *node = malloc(sizeof(ASTNode));
     if (!node)
         return NULL;
     node->type = AST_PRINT;
-    node->data.expr = expr;
+    node->data.print.count = 0;
+    node->data.print.capacity = 4; // start small
+    node->data.print.expressions = malloc(sizeof(ASTNode *) * node->data.print.capacity);
+    if (!node->data.print.expressions)
+    {
+        free(node);
+        return NULL;
+    }
     return node;
+}
+
+void print_add_expression(ASTNode *print_node, ASTNode *expr)
+{
+    if (print_node->data.print.count >= print_node->data.print.capacity)
+    {
+        print_node->data.print.capacity *= 2;
+        ASTNode **newbuf = realloc(print_node->data.print.expressions,
+                                   sizeof(ASTNode *) * print_node->data.print.capacity);
+        if (!newbuf)
+            return; // memory error, but we'll ignore for now
+        print_node->data.print.expressions = newbuf;
+    }
+    print_node->data.print.expressions[print_node->data.print.count++] = expr;
 }
 
 // For string
@@ -109,7 +130,9 @@ void free_ast(ASTNode *node)
     switch (node->type)
     {
     case AST_PRINT:
-        free_ast(node->data.expr);
+        for (int i = 0; i < node->data.print.count; i++)
+            free_ast(node->data.print.expressions[i]);
+        free(node->data.print.expressions);
         break;
     case AST_STRING:
         free(node->data.strValue);
