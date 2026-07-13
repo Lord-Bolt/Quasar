@@ -167,7 +167,7 @@ int main(int argc, char **argv)
     }
 
     // Read the entire .qs file
-    FILE *in = fopen(source_file, "r");
+    FILE *in = fopen(source_file, "rb");
     if (!in)
     {
         fprintf(stderr, "Error: cannot open '%s'\n", source_file);
