@@ -7,6 +7,31 @@
 #include <stdbool.h>
 #include <string.h>
 
+static int parse_errors = 0;
+
+static VarType expr_type(ASTNode *node)
+{
+    if (!node)
+        return TYPE_INT; // safe default
+    switch (node->type)
+    {
+    case AST_INTEGER:
+        return TYPE_INT;
+    case AST_FLOAT:
+        return TYPE_FLOAT;
+    case AST_STRING:
+        return TYPE_STRING;
+    case AST_CHAR:
+        return TYPE_CHAR;
+    case AST_BOOL:
+        return TYPE_BOOL;
+    case AST_VARIABLE:
+        return symtab_lookup(node->data.varName);
+    default:
+        return TYPE_INT;
+    }
+}
+
 static VarType token_to_vartype(QTokenType type)
 {
     switch (type)
@@ -71,15 +96,6 @@ const char *token_name(QTokenType type)
     }
 }
 
-static void free_token_string(Token *token)
-{
-    if (token->str)
-    {
-        free(token->str);
-        token->str = NULL;
-    }
-}
-
 // --- Lexer interface ---
 static const char *g_source;
 static int g_pos;
@@ -109,11 +125,18 @@ static bool expect(QTokenType type, const char *context)
         if (context)
             fprintf(stderr, " (%s)", context);
         fprintf(stderr, ", but got %s\n", token_name(g_current.type));
+        parse_errors++;
         return false;
     }
     return true;
 }
+
 // ---Recursive Descent Fuctions---
+int parser_error_count(void)
+{
+    return parse_errors;
+}
+
 static ASTNode *parse_expression(void)
 {
     // For now, only int
@@ -163,6 +186,7 @@ static ASTNode *parse_expression(void)
 
     fprintf(stderr, "Parser error: expected expression, but got %s\n",
             token_name(g_current.type));
+    parse_errors++;
     return NULL;
 }
 
@@ -184,11 +208,18 @@ static ASTNode *parse_assignment(const char *name)
         free_ast(value);
         return NULL;
     }
-    // Check that the variable exists in the symbol table
-    // For now,  won't enforce that it exists (maybe it was defined with let earlier).
-    // But symtab_lookup returns TYPE_INT if not found, which is a problem.
-    // add a proper check later when symbol table has explicit existence tracking.
-    // For now, just proceed.
+
+    // Type check the new value
+    VarType var_type = symtab_lookup(name);
+    VarType val_type = expr_type(value);
+    if (var_type != val_type)
+    {
+        fprintf(stderr, "Error: type mismatch in assignment to '%s' - expected %s but got %s\n",
+                name, ctype_string(var_type), ctype_string(val_type));
+        parse_errors++;
+        free_ast(value);
+        return NULL;
+    }
 
     return make_assign(name, value);
 }
@@ -303,6 +334,18 @@ static ASTNode *parse_let_statement(void)
     // Register in symbol table
     symtab_add(name, type);
 
+    // Type check the initializer
+    VarType init_type = expr_type(init);
+    if (init_type != type)
+    {
+        fprintf(stderr, "Error: type mismatch in 'let %s' - expected %s but got %s\n",
+                name, ctype_string(type), ctype_string(init_type));
+        parse_errors++;
+        free(name);
+        free_ast(init);
+        return NULL;
+    }
+
     return make_let(name, type, init);
 }
 
@@ -338,6 +381,7 @@ static ASTNode *parse_statement(void)
     default:
         fprintf(stderr, "Parser error: unexpected token %s at start of statement\n",
                 token_name(g_current.type));
+        parse_errors++;
         return NULL;
     }
 }
@@ -352,14 +396,6 @@ ASTNode *parse_program(const char *source)
 
     while (g_current.type != QTOKEN_EOF)
     {
-        // Skip stray unknown tokens
-        if (g_current.type == QTOKEN_UNKNOWN)
-        {
-            free_token_string(&g_current);
-            advance();
-            continue;
-        }
-
         ASTNode *stmt = parse_statement();
         if (stmt)
         {
@@ -369,16 +405,21 @@ ASTNode *parse_program(const char *source)
         else
         {
             // Syntax error – skip to next statement
-            fprintf(stderr, "Warning: skipping malformed statement\n");
             // Go to the start of the next statement (after the next semicolon)
-            while (g_current.type != QTOKEN_SEMICOLON && g_current.type != QTOKEN_EOF)
+            // Skip tokens until we reach a recovery point
+            while (g_current.type != QTOKEN_SEMICOLON &&
+                   g_current.type != QTOKEN_EOF &&
+                   g_current.type != QTOKEN_PRINT &&
+                   g_current.type != QTOKEN_LET &&
+                   g_current.type != QTOKEN_IDENTIFIER) // identifiers can begin assignment statements
             {
-                free_token_string(&g_current);
                 advance();
             }
+            // If we stopped at a statement‑start token, we leave it for the next iteration.
+            // If we stopped at a semicolon, consume it and then continue.
             if (g_current.type == QTOKEN_SEMICOLON)
             {
-                advance(); // consume the semicolon
+                advance();
             }
             // The loop will now try the next statement
         }

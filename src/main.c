@@ -190,9 +190,17 @@ int main(int argc, char **argv)
     // Parse
     ASTNode *ast = parse_program(source);
     free(source);
+    source = NULL;
     if (!ast)
     {
         fprintf(stderr, "Parsing failed.\n");
+        return 1;
+    }
+
+    if (parser_error_count() > 0)
+    {
+        fprintf(stderr, "Compilation failed with %d error(s).\n", parser_error_count());
+        free_ast(ast);
         return 1;
     }
 
