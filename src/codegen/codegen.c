@@ -20,11 +20,10 @@ static const char *format_spec_for(ASTNode *node)
         return "%c";
     case AST_BOOL:
         return "%d";
-    case AST_VARIABLE:
-        // Look up the variable's type in the symbol table
+    case AST_VARIABLE: // Look up the variable's type in the symbol table
         return ctype_spec_string(symtab_lookup(node->data.varName));
     default:
-        return "???";
+        return "???"; // error
     }
 }
 
@@ -117,6 +116,13 @@ static void emit_statement(ASTNode *node, FILE *out, int indent_level)
 
     case AST_LET:
         // already handled in declarations
+        break;
+
+    case AST_ASSIGN:
+        indent(out, indent_level);
+        fprintf(out, "%s = ", node->data.assign.name);
+        emit_expression(node->data.assign.value, out);
+        fprintf(out, ";\n");
         break;
 
     default:

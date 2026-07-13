@@ -166,6 +166,33 @@ static ASTNode *parse_expression(void)
     return NULL;
 }
 
+static ASTNode *parse_assignment(const char *name)
+{
+    // name is the variable being assigned (already consumed from the token)
+    // Current token should be '='
+    if (!expect(QTOKEN_EQUALS, "expected '=' in assignment"))
+    {
+        return NULL;
+    }
+    ASTNode *value = parse_expression();
+    if (!value)
+    {
+        return NULL;
+    }
+    if (!expect(QTOKEN_SEMICOLON, "expected ';' after assignment"))
+    {
+        free_ast(value);
+        return NULL;
+    }
+    // Check that the variable exists in the symbol table
+    // For now,  won't enforce that it exists (maybe it was defined with let earlier).
+    // But symtab_lookup returns TYPE_INT if not found, which is a problem.
+    // add a proper check later when symbol table has explicit existence tracking.
+    // For now, just proceed.
+
+    return make_assign(name, value);
+}
+
 static ASTNode *parse_print_statement(void)
 {
     advance(); // consume 'print'
@@ -287,6 +314,27 @@ static ASTNode *parse_statement(void)
         return parse_print_statement();
     case QTOKEN_LET:
         return parse_let_statement();
+    case QTOKEN_IDENTIFIER:
+    {
+        // Save the identifier name
+        char *name = strdup(g_current.str);
+        advance(); // consume identifier, Check if followed by '='
+        if (g_current.type == QTOKEN_EQUALS)
+        {
+            ASTNode *assign = parse_assignment(name);
+            free(name);
+            return assign;
+        }
+        else
+        {
+            // Not an assignment; perhaps a function call later? For now, error.
+            fprintf(stderr, "Unexpected token after identifier '%s' (expected '=' for assignment)\n", name);
+            free(name);
+            // Skip to next statement? We'll just return NULL to trigger recovery.
+            return NULL;
+        }
+        break;
+    }
     default:
         fprintf(stderr, "Parser error: unexpected token %s at start of statement\n",
                 token_name(g_current.type));

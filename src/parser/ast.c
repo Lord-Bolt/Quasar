@@ -145,6 +145,18 @@ ASTNode *make_variable(const char *name)
     return node;
 }
 
+// for reassignment of var
+ASTNode *make_assign(const char *name, ASTNode *value)
+{
+    ASTNode *node = malloc(sizeof(ASTNode));
+    if (!node)
+        return NULL;
+    node->type = AST_ASSIGN;
+    node->data.assign.name = strdup(name);
+    node->data.assign.value = value;
+    return node;
+}
+
 // Update free_ast to handle AST_PROGRAM
 void free_ast(ASTNode *node)
 {
@@ -175,6 +187,10 @@ void free_ast(ASTNode *node)
         break;
     case AST_VARIABLE:
         free(node->data.varName);
+        break;
+    case AST_ASSIGN:
+        free(node->data.assign.name);
+        free_ast(node->data.assign.value);
         break;
     default:
         break;

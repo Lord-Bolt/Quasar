@@ -12,6 +12,7 @@ typedef enum
     AST_BOOL,
     AST_LET,
     AST_VARIABLE,
+    AST_ASSIGN,
     AST_PROGRAM
 } ASTNodeType;
 
@@ -46,11 +47,17 @@ typedef struct ASTNode
             int count;
             int capacity;
         } program;
+
+        struct
+        {
+            char *name;            // variable name
+            struct ASTNode *value; // right-hand expression
+        } assign;                  // for AST_ASSIGN
     } data;
 } ASTNode;
 
 ASTNode *make_integer(int value);
-ASTNode *make_print_empty(void); // create empty print node
+ASTNode *make_print_empty(void);
 ASTNode *make_string(const char *value);
 ASTNode *make_program(void);
 ASTNode *make_float(double value);
@@ -58,6 +65,7 @@ ASTNode *make_char(char value);
 ASTNode *make_bool(int value);
 ASTNode *make_let(const char *name, VarType type, ASTNode *init);
 ASTNode *make_variable(const char *name);
+ASTNode *make_assign(const char *name, ASTNode *value);
 
 void print_add_expression(ASTNode *print_node, ASTNode *expr); // add an expression to the print node
 void program_add_statement(ASTNode *program, ASTNode *stmt);   // adds a child to the program
