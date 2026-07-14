@@ -55,26 +55,45 @@ static VarType infer_type(ASTNode *node)
     }
 }
 
-static bool valid_arithmetic_types(VarType left, VarType right, BinaryOp op)
+static bool valid_binary_types(VarType left, VarType right, BinaryOp op)
 {
-    // Allowed combinations for arithmetic (+ - * / % ** //)
-    (void)op; // reserved for future use (string ops)
-    if (left == TYPE_INT || left == TYPE_FLOAT)
+    switch (op)
     {
-        return (right == TYPE_INT || right == TYPE_FLOAT);
+    case OP_ADD:
+    case OP_SUB:
+    case OP_MUL:
+    case OP_DIV:
+    case OP_MOD:
+    case OP_POW:
+    case OP_FLDIV:
+        return (left == TYPE_INT || left == TYPE_FLOAT) && (right == TYPE_INT || right == TYPE_FLOAT);
+    case OP_EQ:
+    case OP_NE:
+        // Allow int/float mixing, char vs char, bool vs bool (bool is int)
+        if (left == TYPE_STRING || right == TYPE_STRING)
+            return false; // no string comparison yet
+        return (left == TYPE_INT || left == TYPE_FLOAT) && (right == TYPE_INT || right == TYPE_FLOAT);
+    case OP_LT:
+    case OP_GT:
+    case OP_LE:
+    case OP_GE:
+        // Only int/float can be ordered
+        return (left == TYPE_INT || left == TYPE_FLOAT) && (right == TYPE_INT || right == TYPE_FLOAT);
+    default:
+        return false;
     }
-    // Future: string + string, string * int – not yet, so error for now
-    return false;
 }
 
 static bool check_binary_types(BinaryOp op, ASTNode *left, ASTNode *right)
 {
-    VarType ltype = infer_type(left); // from codegen.c – we need to duplicate or move to parser?
+    VarType ltype = infer_type(left);
     VarType rtype = infer_type(right);
-    if (!valid_arithmetic_types(ltype, rtype, op))
+    if (!valid_binary_types(ltype, rtype, op))
     {
-        fprintf(stderr, "Error: invalid operand types for arithmetic operator (");
-        // print operator name
+        fprintf(stderr, "Error: invalid operand types for ");
+        // Determine if it's arithmetic or relational based on op
+        bool is_relational = (op == OP_EQ || op == OP_NE || op == OP_LT || op == OP_GT || op == OP_LE || op == OP_GE);
+        fprintf(stderr, "%s operator (", is_relational ? "relational" : "arithmetic");
         switch (op)
         {
         case OP_ADD:
@@ -97,6 +116,24 @@ static bool check_binary_types(BinaryOp op, ASTNode *left, ASTNode *right)
             break;
         case OP_FLDIV:
             fprintf(stderr, "//");
+            break;
+        case OP_EQ:
+            fprintf(stderr, "==");
+            break;
+        case OP_NE:
+            fprintf(stderr, "!=");
+            break;
+        case OP_LT:
+            fprintf(stderr, "<");
+            break;
+        case OP_GT:
+            fprintf(stderr, ">");
+            break;
+        case OP_LE:
+            fprintf(stderr, "<=");
+            break;
+        case OP_GE:
+            fprintf(stderr, ">=");
             break;
         default:
             fprintf(stderr, "?");
@@ -567,10 +604,62 @@ static ASTNode *parse_additive(void)
     return node;
 }
 
+static ASTNode *parse_relational(void)
+{
+    ASTNode *node = parse_additive();
+    if (!node)
+        return NULL;
+    while (g_current.type == QTOKEN_EQ_EQ || g_current.type == QTOKEN_NOT_EQ ||
+           g_current.type == QTOKEN_LT || g_current.type == QTOKEN_GT ||
+           g_current.type == QTOKEN_LT_EQ || g_current.type == QTOKEN_GT_EQ)
+    {
+        BinaryOp op;
+        switch (g_current.type)
+        {
+        case QTOKEN_EQ_EQ:
+            op = OP_EQ;
+            break;
+        case QTOKEN_NOT_EQ:
+            op = OP_NE;
+            break;
+        case QTOKEN_LT:
+            op = OP_LT;
+            break;
+        case QTOKEN_GT:
+            op = OP_GT;
+            break;
+        case QTOKEN_LT_EQ:
+            op = OP_LE;
+            break;
+        case QTOKEN_GT_EQ:
+            op = OP_GE;
+            break;
+        default:
+            op = OP_ADD;
+            break; // unreachable
+        }
+        advance();
+        ASTNode *right = parse_additive();
+        if (!right)
+        {
+            free_ast(node);
+            return NULL;
+        }
+        node = make_binary(op, node, right);
+        // Type-check the binary expression
+        if (!check_binary_types(op, node->data.binary.left, node->data.binary.right))
+        {
+            free_ast(node);
+            return NULL;
+        }
+    }
+    return node;
+}
+
 // redefine parse_expression to start at the lowest precedence (additive)
 static ASTNode *parse_expression(void)
 {
-    return parse_additive();
+    return parse_relational();
 }
 
 ASTNode *parse_program(const char *source)

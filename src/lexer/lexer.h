@@ -31,6 +31,12 @@ typedef enum
     QTOKEN_PERCENT,   // %
     QTOKEN_POWER,     // **
     QTOKEN_FLOOR_DIV, // //
+    QTOKEN_LT,        // <
+    QTOKEN_GT,        // >
+    QTOKEN_LT_EQ,     // <=
+    QTOKEN_GT_EQ,     // >=
+    QTOKEN_EQ_EQ,     // ==
+    QTOKEN_NOT_EQ,    // !=
     QTOKEN_UNKNOWN
 } QTokenType;
 

@@ -360,6 +360,13 @@ Token get_next_token(const char *source, int *pos)
         }
     case '=':
         (*pos)++;
+        if (source[*pos] == '=')
+        {
+            (*pos)++;
+            Token t = {.type = QTOKEN_EQ_EQ, .value = 0, .str = NULL};
+            return t;
+        }
+        else
         {
             Token t = {.type = QTOKEN_EQUALS, .value = 0, .str = NULL};
             return t;
@@ -414,6 +421,46 @@ Token get_next_token(const char *source, int *pos)
         (*pos)++;
         {
             Token t = {.type = QTOKEN_PERCENT, .value = 0, .str = NULL};
+            return t;
+        }
+    case '<':
+        (*pos)++;
+        if (source[*pos] == '=')
+        {
+            (*pos)++;
+            Token t = {.type = QTOKEN_LT_EQ, .value = 0, .str = NULL};
+            return t;
+        }
+        else
+        {
+            Token t = {.type = QTOKEN_LT, .value = 0, .str = NULL};
+            return t;
+        }
+    case '>':
+        (*pos)++;
+        if (source[*pos] == '=')
+        {
+            (*pos)++;
+            Token t = {.type = QTOKEN_GT_EQ, .value = 0, .str = NULL};
+            return t;
+        }
+        else
+        {
+            Token t = {.type = QTOKEN_GT, .value = 0, .str = NULL};
+            return t;
+        }
+    case '!':
+        (*pos)++;
+        if (source[*pos] == '=')
+        {
+            (*pos)++;
+            Token t = {.type = QTOKEN_NOT_EQ, .value = 0, .str = NULL};
+            return t;
+        }
+        else
+        {
+            // bare '!' is not (yet) supported
+            Token t = {.type = QTOKEN_UNKNOWN, .value = 0, .str = NULL};
             return t;
         }
     }

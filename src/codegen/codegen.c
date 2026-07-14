@@ -31,6 +31,11 @@ static VarType infer_type(ASTNode *node)
         VarType left = infer_type(node->data.binary.left);
         VarType right = infer_type(node->data.binary.right);
         BinaryOp op = node->data.binary.op;
+        if (op == OP_EQ || op == OP_NE || op == OP_LT || op == OP_GT || op == OP_LE || op == OP_GE)
+        {
+            return TYPE_BOOL; // results are 0 or 1
+        }
+
         if (op == OP_POW)
             return TYPE_FLOAT;
 
@@ -70,6 +75,18 @@ static const char *op_to_cstring(BinaryOp op)
         return "pow"; // we'll emit pow()
     case OP_FLDIV:
         return "/"; // floor division in C is just / with ints; but we'll handle type later
+    case OP_EQ:
+        return "==";
+    case OP_NE:
+        return "!=";
+    case OP_LT:
+        return "<";
+    case OP_GT:
+        return ">";
+    case OP_LE:
+        return "<=";
+    case OP_GE:
+        return ">=";
     default:
         return "???";
     }
