@@ -6,24 +6,92 @@
 static void emit_statement(ASTNode *node, FILE *out, int indent);
 static void emit_expression(ASTNode *node, FILE *out);
 
-static const char *format_spec_for(ASTNode *node)
+// Returns the Quasar variable type of an expression node.
+static VarType infer_type(ASTNode *node)
 {
+    if (!node)
+        return TYPE_INT; // safe default
     switch (node->type)
     {
     case AST_INTEGER:
-        return "%d";
+        return TYPE_INT;
     case AST_FLOAT:
-        return "%g";
+        return TYPE_FLOAT;
     case AST_STRING:
-        return "%s";
+        return TYPE_STRING;
     case AST_CHAR:
-        return "%c";
+        return TYPE_CHAR;
     case AST_BOOL:
-        return "%d";
-    case AST_VARIABLE: // Look up the variable's type in the symbol table
-        return ctype_spec_string(symtab_lookup(node->data.varName));
+        return TYPE_BOOL;
+    case AST_VARIABLE:
+        return symtab_lookup(node->data.varName);
+
+    case AST_BINARY:
+    {
+        VarType left = infer_type(node->data.binary.left);
+        VarType right = infer_type(node->data.binary.right);
+        BinaryOp op = node->data.binary.op;
+        if (op == OP_POW)
+            return TYPE_FLOAT;
+
+        // Arithmetic operators: if either operand is float, result is float; otherwise int.
+        if (op == OP_ADD || op == OP_SUB || op == OP_MUL || op == OP_DIV ||
+            op == OP_MOD || op == OP_FLDIV)
+        {
+            if (left == TYPE_FLOAT || right == TYPE_FLOAT)
+                return TYPE_FLOAT;
+            return TYPE_INT; // both ints -> int
+        }
+        // For future operators (relational, logical), they will return TYPE_BOOL (int).
+        // We'll handle them when we add those operators.
+        return TYPE_INT; // fallback
+    }
+
     default:
-        return "???"; // error
+        return TYPE_INT; // safe fallback for any unknown node
+    }
+}
+
+static const char *op_to_cstring(BinaryOp op)
+{
+    switch (op)
+    {
+    case OP_ADD:
+        return "+";
+    case OP_SUB:
+        return "-";
+    case OP_MUL:
+        return "*";
+    case OP_DIV:
+        return "/";
+    case OP_MOD:
+        return "%";
+    case OP_POW:
+        return "pow"; // we'll emit pow()
+    case OP_FLDIV:
+        return "/"; // floor division in C is just / with ints; but we'll handle type later
+    default:
+        return "???";
+    }
+}
+
+static const char *format_spec_for(ASTNode *node)
+{
+    VarType type = infer_type(node);
+    switch (type)
+    {
+    case TYPE_INT:
+        return "%d";
+    case TYPE_FLOAT:
+        return "%g";
+    case TYPE_STRING:
+        return "%s";
+    case TYPE_CHAR:
+        return "%c";
+    case TYPE_BOOL:
+        return "%d"; // bools print as 1/0
+    default:
+        return "%d"; // fallback
     }
 }
 
@@ -43,6 +111,7 @@ void generate_code(ASTNode *program, FILE *out)
         exit(1);
     }
     fprintf(out, "#include <stdio.h>\n\n");
+    fprintf(out, "#include <math.h>\n");
     fprintf(out, "int main(void) {\n");
 
     // First pass: emit all variable declarations (AST_LET)
@@ -236,6 +305,27 @@ static void emit_expression(ASTNode *node, FILE *out)
     case AST_VARIABLE:
         fprintf(out, "%s", node->data.varName);
         break;
+    case AST_BINARY:
+    {
+        // Special case for exponent: use pow() function
+        if (node->data.binary.op == OP_POW)
+        {
+            fprintf(out, "pow(");
+            emit_expression(node->data.binary.left, out);
+            fprintf(out, ", ");
+            emit_expression(node->data.binary.right, out);
+            fprintf(out, ")");
+        }
+        else
+        {
+            fprintf(out, "(");
+            emit_expression(node->data.binary.left, out);
+            fprintf(out, " %s ", op_to_cstring(node->data.binary.op));
+            emit_expression(node->data.binary.right, out);
+            fprintf(out, ")");
+        }
+        break;
+    }
     default:
         break;
     }

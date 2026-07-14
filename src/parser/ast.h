@@ -13,8 +13,20 @@ typedef enum
     AST_LET,
     AST_VARIABLE,
     AST_ASSIGN,
-    AST_PROGRAM
+    AST_PROGRAM,
+    AST_BINARY
 } ASTNodeType;
+
+typedef enum
+{
+    OP_ADD,
+    OP_SUB,
+    OP_MUL,
+    OP_DIV,
+    OP_MOD,
+    OP_POW,
+    OP_FLDIV
+} BinaryOp;
 
 typedef struct ASTNode
 {
@@ -53,6 +65,13 @@ typedef struct ASTNode
             char *name;            // variable name
             struct ASTNode *value; // right-hand expression
         } assign;                  // for AST_ASSIGN
+
+        struct
+        {
+            BinaryOp op;
+            struct ASTNode *left; // for binary operations
+            struct ASTNode *right;
+        } binary;
     } data;
 } ASTNode;
 
@@ -66,6 +85,7 @@ ASTNode *make_bool(int value);
 ASTNode *make_let(const char *name, VarType type, ASTNode *init);
 ASTNode *make_variable(const char *name);
 ASTNode *make_assign(const char *name, ASTNode *value);
+ASTNode *make_binary(BinaryOp op, ASTNode *left, ASTNode *right);
 
 void print_add_expression(ASTNode *print_node, ASTNode *expr); // add an expression to the print node
 void program_add_statement(ASTNode *program, ASTNode *stmt);   // adds a child to the program

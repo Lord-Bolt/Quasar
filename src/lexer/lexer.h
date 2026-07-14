@@ -24,6 +24,13 @@ typedef enum
     QTOKEN_COLON,
     QTOKEN_EQUALS,
     QTOKEN_EOF,
+    QTOKEN_PLUS,      // +
+    QTOKEN_MINUS,     // -
+    QTOKEN_STAR,      // *
+    QTOKEN_SLASH,     // /
+    QTOKEN_PERCENT,   // %
+    QTOKEN_POWER,     // **
+    QTOKEN_FLOOR_DIV, // //
     QTOKEN_UNKNOWN
 } QTokenType;
 

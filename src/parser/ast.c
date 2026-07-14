@@ -157,6 +157,19 @@ ASTNode *make_assign(const char *name, ASTNode *value)
     return node;
 }
 
+// for binary ops
+ASTNode *make_binary(BinaryOp op, ASTNode *left, ASTNode *right)
+{
+    ASTNode *node = malloc(sizeof(ASTNode));
+    if (!node)
+        return NULL;
+    node->type = AST_BINARY;
+    node->data.binary.op = op;
+    node->data.binary.left = left;
+    node->data.binary.right = right;
+    return node;
+}
+
 // Update free_ast to handle AST_PROGRAM
 void free_ast(ASTNode *node)
 {
@@ -191,6 +204,10 @@ void free_ast(ASTNode *node)
     case AST_ASSIGN:
         free(node->data.assign.name);
         free_ast(node->data.assign.value);
+        break;
+    case AST_BINARY:
+        free_ast(node->data.binary.left);
+        free_ast(node->data.binary.right);
         break;
     default:
         break;

@@ -7,7 +7,107 @@
 #include <stdbool.h>
 #include <string.h>
 
+static ASTNode *parse_expression(void);
 static int parse_errors = 0;
+
+static VarType infer_type(ASTNode *node)
+{
+    if (!node)
+        return TYPE_INT; // safe default
+    switch (node->type)
+    {
+    case AST_INTEGER:
+        return TYPE_INT;
+    case AST_FLOAT:
+        return TYPE_FLOAT;
+    case AST_STRING:
+        return TYPE_STRING;
+    case AST_CHAR:
+        return TYPE_CHAR;
+    case AST_BOOL:
+        return TYPE_BOOL;
+    case AST_VARIABLE:
+        return symtab_lookup(node->data.varName);
+
+    case AST_BINARY:
+    {
+        VarType left = infer_type(node->data.binary.left);
+        VarType right = infer_type(node->data.binary.right);
+        BinaryOp op = node->data.binary.op;
+        if (op == OP_POW)
+            return TYPE_FLOAT;
+
+        // Arithmetic operators: if either operand is float, result is float; otherwise int.
+        if (op == OP_ADD || op == OP_SUB || op == OP_MUL || op == OP_DIV ||
+            op == OP_MOD || op == OP_FLDIV)
+        {
+            if (left == TYPE_FLOAT || right == TYPE_FLOAT)
+                return TYPE_FLOAT;
+            return TYPE_INT; // both ints -> int
+        }
+        // For future operators (relational, logical), they will return TYPE_BOOL (int).
+        // We'll handle them when we add those operators.
+        return TYPE_INT; // fallback
+    }
+
+    default:
+        return TYPE_INT; // safe fallback for any unknown node
+    }
+}
+
+static bool valid_arithmetic_types(VarType left, VarType right, BinaryOp op)
+{
+    // Allowed combinations for arithmetic (+ - * / % ** //)
+    (void)op; // reserved for future use (string ops)
+    if (left == TYPE_INT || left == TYPE_FLOAT)
+    {
+        return (right == TYPE_INT || right == TYPE_FLOAT);
+    }
+    // Future: string + string, string * int – not yet, so error for now
+    return false;
+}
+
+static bool check_binary_types(BinaryOp op, ASTNode *left, ASTNode *right)
+{
+    VarType ltype = infer_type(left); // from codegen.c – we need to duplicate or move to parser?
+    VarType rtype = infer_type(right);
+    if (!valid_arithmetic_types(ltype, rtype, op))
+    {
+        fprintf(stderr, "Error: invalid operand types for arithmetic operator (");
+        // print operator name
+        switch (op)
+        {
+        case OP_ADD:
+            fprintf(stderr, "+");
+            break;
+        case OP_SUB:
+            fprintf(stderr, "-");
+            break;
+        case OP_MUL:
+            fprintf(stderr, "*");
+            break;
+        case OP_DIV:
+            fprintf(stderr, "/");
+            break;
+        case OP_MOD:
+            fprintf(stderr, "%%");
+            break;
+        case OP_POW:
+            fprintf(stderr, "**");
+            break;
+        case OP_FLDIV:
+            fprintf(stderr, "//");
+            break;
+        default:
+            fprintf(stderr, "?");
+            break;
+        }
+        fprintf(stderr, "): %s and %s\n", ctype_string(ltype), ctype_string(rtype));
+        parse_errors++;
+        return false;
+    }
+    return true;
+}
 
 static VarType expr_type(ASTNode *node)
 {
@@ -137,55 +237,64 @@ int parser_error_count(void)
     return parse_errors;
 }
 
-static ASTNode *parse_expression(void)
+static ASTNode *parse_primary(void)
 {
-    // For now, only int
     if (g_current.type == QTOKEN_INTEGER)
     {
         int val = g_current.value;
         advance();
         return make_integer(val);
     }
-    else if (g_current.type == QTOKEN_FLOAT)
+    if (g_current.type == QTOKEN_FLOAT)
     {
         double val = g_current.floatValue;
         advance();
         return make_float(val);
     }
-    else if (g_current.type == QTOKEN_STRING)
+    if (g_current.type == QTOKEN_STRING)
     {
-        char *str = g_current.str; // take ownership
-        advance();                 // consume token
+        char *str = g_current.str;
+        advance();
         ASTNode *node = make_string(str);
-        free(str); // since make_string already strdup'd it
+        free(str);
         return node;
     }
-    else if (g_current.type == QTOKEN_CHAR)
+    if (g_current.type == QTOKEN_CHAR)
     {
-        char val = (char)g_current.value; // value holds the decoded character
+        char val = (char)g_current.value;
         advance();
         return make_char(val);
     }
-    else if (g_current.type == QTOKEN_IDENTIFIER)
-    {
-        char *name = strdup(g_current.str); // duplicate for AST
-        advance();
-        // symtab_lookup could be used later for type checking
-        return make_variable(name);
-    }
-    else if (g_current.type == QTOKEN_TRUE)
+    if (g_current.type == QTOKEN_TRUE)
     {
         advance();
         return make_bool(1);
     }
-    else if (g_current.type == QTOKEN_FALSE)
+    if (g_current.type == QTOKEN_FALSE)
     {
         advance();
         return make_bool(0);
     }
-
-    fprintf(stderr, "Parser error: expected expression, but got %s\n",
-            token_name(g_current.type));
+    if (g_current.type == QTOKEN_IDENTIFIER)
+    {
+        char *name = strdup(g_current.str);
+        advance();
+        return make_variable(name);
+    }
+    if (g_current.type == QTOKEN_LPAREN)
+    {
+        advance();                          // consume '('
+        ASTNode *expr = parse_expression(); // will call the new top-level
+        if (!expr)
+            return NULL;
+        if (!expect(QTOKEN_RPAREN, "expected ')' after expression"))
+        {
+            free_ast(expr);
+            return NULL;
+        }
+        return expr;
+    }
+    fprintf(stderr, "Parse error: expected expression, but got %s\n", token_name(g_current.type));
     parse_errors++;
     return NULL;
 }
@@ -384,6 +493,84 @@ static ASTNode *parse_statement(void)
         parse_errors++;
         return NULL;
     }
+}
+
+static ASTNode *parse_multiplicative(void)
+{
+    ASTNode *node = parse_primary();
+    if (!node)
+        return NULL;
+    while (g_current.type == QTOKEN_STAR || g_current.type == QTOKEN_SLASH ||
+           g_current.type == QTOKEN_PERCENT || g_current.type == QTOKEN_POWER ||
+           g_current.type == QTOKEN_FLOOR_DIV)
+    {
+        BinaryOp op;
+        switch (g_current.type)
+        {
+        case QTOKEN_STAR:
+            op = OP_MUL;
+            break;
+        case QTOKEN_SLASH:
+            op = OP_DIV;
+            break;
+        case QTOKEN_PERCENT:
+            op = OP_MOD;
+            break;
+        case QTOKEN_POWER:
+            op = OP_POW;
+            break;
+        case QTOKEN_FLOOR_DIV:
+            op = OP_FLDIV;
+            break;
+        default:
+            break;
+        }
+        advance(); // consume operator
+        ASTNode *right = parse_primary();
+        if (!right)
+        {
+            free_ast(node);
+            return NULL;
+        }
+        node = make_binary(op, node, right);
+        if (!check_binary_types(op, node->data.binary.left, node->data.binary.right))
+        {
+            free_ast(node);
+            return NULL;
+        }
+    }
+    return node;
+}
+
+static ASTNode *parse_additive(void)
+{
+    ASTNode *node = parse_multiplicative();
+    if (!node)
+        return NULL;
+    while (g_current.type == QTOKEN_PLUS || g_current.type == QTOKEN_MINUS)
+    {
+        BinaryOp op = (g_current.type == QTOKEN_PLUS) ? OP_ADD : OP_SUB;
+        advance();
+        ASTNode *right = parse_multiplicative();
+        if (!right)
+        {
+            free_ast(node);
+            return NULL;
+        }
+        node = make_binary(op, node, right);
+        if (!check_binary_types(op, node->data.binary.left, node->data.binary.right))
+        {
+            free_ast(node);
+            return NULL;
+        }
+    }
+    return node;
+}
+
+// redefine parse_expression to start at the lowest precedence (additive)
+static ASTNode *parse_expression(void)
+{
+    return parse_additive();
 }
 
 ASTNode *parse_program(const char *source)

@@ -364,6 +364,58 @@ Token get_next_token(const char *source, int *pos)
             Token t = {.type = QTOKEN_EQUALS, .value = 0, .str = NULL};
             return t;
         }
+    case '+':
+        (*pos)++;
+        {
+            Token t = {.type = QTOKEN_PLUS, .value = 0, .str = NULL};
+            return t;
+        }
+    case '-':
+        (*pos)++;
+        {
+            Token t = {.type = QTOKEN_MINUS, .value = 0, .str = NULL};
+            return t;
+        }
+    case '*':
+        (*pos)++;
+        if (source[*pos] == '*')
+        {
+            (*pos)++;
+            {
+                Token t = {.type = QTOKEN_POWER, .value = 0, .str = NULL};
+                return t;
+            }
+        }
+        else
+        {
+            {
+                Token t = {.type = QTOKEN_STAR, .value = 0, .str = NULL};
+                return t;
+            }
+        }
+    case '/':
+        (*pos)++;
+        if (source[*pos] == '/')
+        {
+            (*pos)++;
+            {
+                Token t = {.type = QTOKEN_FLOOR_DIV, .value = 0, .str = NULL};
+                return t;
+            }
+        }
+        else
+        {
+            {
+                Token t = {.type = QTOKEN_SLASH, .value = 0, .str = NULL};
+                return t;
+            }
+        }
+    case '%':
+        (*pos)++;
+        {
+            Token t = {.type = QTOKEN_PERCENT, .value = 0, .str = NULL};
+            return t;
+        }
     }
 
     // Unknown char
