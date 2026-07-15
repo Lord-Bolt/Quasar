@@ -66,19 +66,19 @@ static bool valid_binary_types(VarType left, VarType right, BinaryOp op)
     case OP_MOD:
     case OP_POW:
     case OP_FLDIV:
-        return (left == TYPE_INT || left == TYPE_FLOAT) && (right == TYPE_INT || right == TYPE_FLOAT);
+        return (left == TYPE_INT || left == TYPE_FLOAT) &&
+               (right == TYPE_INT || right == TYPE_FLOAT);
     case OP_EQ:
     case OP_NE:
-        // Allow int/float mixing, char vs char, bool vs bool (bool is int)
-        if (left == TYPE_STRING || right == TYPE_STRING)
-            return false; // no string comparison yet
-        return (left == TYPE_INT || left == TYPE_FLOAT) && (right == TYPE_INT || right == TYPE_FLOAT);
+        // Allow int/float/bool mixing (bool is now a distinct type but comparable)
+        return (left == TYPE_INT || left == TYPE_FLOAT || left == TYPE_BOOL) &&
+               (right == TYPE_INT || right == TYPE_FLOAT || right == TYPE_BOOL);
     case OP_LT:
     case OP_GT:
     case OP_LE:
     case OP_GE:
-        // Only int/float can be ordered
-        return (left == TYPE_INT || left == TYPE_FLOAT) && (right == TYPE_INT || right == TYPE_FLOAT);
+        return (left == TYPE_INT || left == TYPE_FLOAT) &&
+               (right == TYPE_INT || right == TYPE_FLOAT);
     default:
         return false;
     }

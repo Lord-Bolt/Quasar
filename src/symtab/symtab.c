@@ -47,7 +47,7 @@ const char *ctype_string(VarType type)
     case TYPE_CHAR:
         return "char";
     case TYPE_BOOL:
-        return "int";
+        return "bool";
     default:
         return "int";
     }

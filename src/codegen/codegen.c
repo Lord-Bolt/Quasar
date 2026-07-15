@@ -106,7 +106,7 @@ static const char *format_spec_for(ASTNode *node)
     case TYPE_CHAR:
         return "%c";
     case TYPE_BOOL:
-        return "%d"; // bools print as 1/0
+        return "%s"; // bools print as true/false as str
     default:
         return "%d"; // fallback
     }
@@ -127,8 +127,9 @@ void generate_code(ASTNode *program, FILE *out)
         fprintf(stderr, "Error: root node must be AST_PROGRAM\n");
         exit(1);
     }
-    fprintf(out, "#include <stdio.h>\n\n");
-    fprintf(out, "#include <math.h>\n");
+    fprintf(out, "#include <stdio.h>\n");
+    fprintf(out, "#include <stdbool.h>\n");
+    fprintf(out, "#include <math.h>\n\n");
     fprintf(out, "int main(void) {\n");
 
     // First pass: emit all variable declarations (AST_LET)
@@ -159,6 +160,20 @@ void generate_code(ASTNode *program, FILE *out)
 
     fprintf(out, "    return 0;\n");
     fprintf(out, "}\n");
+}
+
+static void emit_expression_maybe_bool(ASTNode *node, FILE *out) // boolean helper
+{
+    if (infer_type(node) == TYPE_BOOL)
+    {
+        fprintf(out, "((");
+        emit_expression(node, out);
+        fprintf(out, ") ? \"true\" : \"false\")");
+    }
+    else
+    {
+        emit_expression(node, out);
+    }
 }
 
 // Recursively emit code for a statement (for now only print)
@@ -194,7 +209,7 @@ static void emit_statement(ASTNode *node, FILE *out, int indent_level)
         for (int i = 0; i < n; i++)
         {
             fprintf(out, ", ");
-            emit_expression(node->data.print.expressions[i], out);
+            emit_expression_maybe_bool(node->data.print.expressions[i], out);
         }
         fprintf(out, ");\n");
         break;
