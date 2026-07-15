@@ -74,6 +74,16 @@ static bool check_unary_types(UnaryOp op, ASTNode *operand)
             return false;
         }
     }
+    else if (op == UNARY_MINUS || op == UNARY_PLUS)
+    {
+        if (t != TYPE_INT && t != TYPE_FLOAT)
+        {
+            fprintf(stderr, "Error: invalid operand type for unary '%c': %s\n",
+                    op == UNARY_MINUS ? '-' : '+', ctype_string(t));
+            parse_errors++;
+            return false;
+        }
+    }
     return true;
 }
 
@@ -306,11 +316,39 @@ static ASTNode *parse_unary(void)
     if (g_current.type == QTOKEN_NOT)
     {
         advance();
-        ASTNode *operand = parse_unary(); // right‑associative
+        ASTNode *operand = parse_unary();
         if (!operand)
             return NULL;
         ASTNode *node = make_unary(UNARY_NOT, operand);
-        if (!check_unary_types(UNARY_NOT, node->data.unary.operand))
+        if (!check_unary_types(UNARY_NOT, operand))
+        {
+            free_ast(node);
+            return NULL;
+        }
+        return node;
+    }
+    if (g_current.type == QTOKEN_MINUS)
+    {
+        advance();
+        ASTNode *operand = parse_unary();
+        if (!operand)
+            return NULL;
+        ASTNode *node = make_unary(UNARY_MINUS, operand);
+        if (!check_unary_types(UNARY_MINUS, operand))
+        {
+            free_ast(node);
+            return NULL;
+        }
+        return node;
+    }
+    if (g_current.type == QTOKEN_PLUS)
+    {
+        advance();
+        ASTNode *operand = parse_unary();
+        if (!operand)
+            return NULL;
+        ASTNode *node = make_unary(UNARY_PLUS, operand);
+        if (!check_unary_types(UNARY_PLUS, operand))
         {
             free_ast(node);
             return NULL;

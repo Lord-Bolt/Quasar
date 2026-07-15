@@ -52,10 +52,9 @@ static VarType infer_type(ASTNode *node)
     case AST_UNARY:
         if (node->data.unary.op == UNARY_NOT)
             return TYPE_BOOL;
-        return TYPE_INT; // <- caused me mental damage
-
+        return infer_type(node->data.unary.operand); // unary +/- keep the operand type
     default:
-        return TYPE_INT; // safe fallback for any unknown node
+        return TYPE_INT; // <- caused mental damage
     }
 }
 
@@ -376,19 +375,24 @@ static void emit_expression(ASTNode *node, FILE *out)
         break;
     }
     case AST_UNARY:
-    {
         if (node->data.unary.op == UNARY_NOT)
         {
-            fprintf(out, "!((");
+            fprintf(out, "!(");
             emit_expression(node->data.unary.operand, out);
-            fprintf(out, "))");
+            fprintf(out, ")");
         }
-        else
+        else if (node->data.unary.op == UNARY_MINUS)
         {
-            fprintf(stderr, "Unknown unary operator\n");
+            fprintf(out, "-(");
+            emit_expression(node->data.unary.operand, out);
+            fprintf(out, ")");
+        }
+        else if (node->data.unary.op == UNARY_PLUS)
+        {
+            // Unary plus is a no‑op
+            emit_expression(node->data.unary.operand, out);
         }
         break;
-    }
     default:
         break;
     }

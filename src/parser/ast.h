@@ -40,7 +40,9 @@ typedef enum
 
 typedef enum
 {
-    UNARY_NOT, // !
+    UNARY_NOT,   // !
+    UNARY_MINUS, // -x
+    UNARY_PLUS   // +x
 } UnaryOp;
 
 typedef struct ASTNode
