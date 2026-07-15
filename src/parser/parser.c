@@ -8,6 +8,8 @@
 #include <string.h>
 
 static ASTNode *parse_expression(void);
+static ASTNode *parse_statement(void);
+
 static int parse_errors = 0;
 
 static VarType infer_type(ASTNode *node)
@@ -269,6 +271,37 @@ static bool expect(QTokenType type, const char *context)
 }
 
 // ---Recursive Descent Fuctions---
+static ASTNode *parse_block(void)
+{
+    // Expect '{'
+    if (!expect(QTOKEN_LBRACE, "expected '{' to start block"))
+        return NULL;
+    ASTNode *block = make_block();
+
+    while (g_current.type != QTOKEN_RBRACE && g_current.type != QTOKEN_EOF)
+    {
+        ASTNode *stmt = parse_statement();
+        if (!stmt)
+        {
+            // Error recovery inside block: skip to next '}' or statement-start
+            while (g_current.type != QTOKEN_RBRACE && g_current.type != QTOKEN_EOF)
+                advance();
+            if (g_current.type == QTOKEN_RBRACE)
+                advance();
+            free_ast(block);
+            return NULL;
+        }
+        block_add_statement(block, stmt);
+    }
+
+    if (!expect(QTOKEN_RBRACE, "expected '}' to close block"))
+    {
+        free_ast(block);
+        return NULL;
+    }
+    return block;
+}
+
 int parser_error_count(void)
 {
     return parse_errors;
@@ -524,6 +557,8 @@ static ASTNode *parse_statement(void)
         }
         break;
     }
+    case QTOKEN_LBRACE:
+        return parse_block();
     default:
         fprintf(stderr, "Parser error: unexpected token %s at start of statement\n",
                 token_name(g_current.type));

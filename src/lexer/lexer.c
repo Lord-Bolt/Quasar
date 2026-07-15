@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-// Helper: check if a word is a keyword (for now, just "print").
+// Helper: check if a word is a keyword
 static QTokenType check_keyword(const char *word)
 {
     if (strcmp(word, "print") == 0)
@@ -25,7 +25,7 @@ static QTokenType check_keyword(const char *word)
         return QTOKEN_TYPE_CHAR;
     if (strcmp(word, "bool") == 0)
         return QTOKEN_TYPE_BOOL;
-    return QTOKEN_UNKNOWN; // not a keyword, maybe an identifier later
+    return QTOKEN_UNKNOWN; // not a keyword, to indentify err
 }
 
 static char *read_string(const char *src, int *pos)
@@ -457,10 +457,23 @@ Token get_next_token(const char *source, int *pos)
             Token t = {.type = QTOKEN_NOT_EQ, .value = 0, .str = NULL};
             return t;
         }
+
         else
         {
             // bare '!' is not (yet) supported
             Token t = {.type = QTOKEN_UNKNOWN, .value = 0, .str = NULL};
+            return t;
+        }
+    case '{':
+        (*pos)++;
+        {
+            Token t = {.type = QTOKEN_LBRACE, .value = 0, .str = NULL};
+            return t;
+        }
+    case '}':
+        (*pos)++;
+        {
+            Token t = {.type = QTOKEN_RBRACE, .value = 0, .str = NULL};
             return t;
         }
     }

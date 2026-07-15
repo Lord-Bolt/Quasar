@@ -170,6 +170,38 @@ ASTNode *make_binary(BinaryOp op, ASTNode *left, ASTNode *right)
     return node;
 }
 
+// for {...}
+ASTNode *make_block(void)
+{
+    ASTNode *node = malloc(sizeof(ASTNode));
+    if (!node)
+        return NULL;
+    node->type = AST_BLOCK;
+    node->data.block.statements = malloc(sizeof(ASTNode *) * 4);
+    if (!node->data.block.statements)
+    {
+        free(node);
+        return NULL;
+    }
+    node->data.block.capacity = 4;
+    node->data.block.count = 0;
+    return node;
+}
+
+void block_add_statement(ASTNode *block, ASTNode *stmt)
+{
+    if (block->data.block.count >= block->data.block.capacity)
+    {
+        block->data.block.capacity *= 2;
+        ASTNode **newbuf = realloc(block->data.block.statements,
+                                   sizeof(ASTNode *) * block->data.block.capacity);
+        if (!newbuf)
+            return; // memory error – we can improve later
+        block->data.block.statements = newbuf;
+    }
+    block->data.block.statements[block->data.block.count++] = stmt;
+}
+
 // Update free_ast to handle AST_PROGRAM
 void free_ast(ASTNode *node)
 {
@@ -208,6 +240,11 @@ void free_ast(ASTNode *node)
     case AST_BINARY:
         free_ast(node->data.binary.left);
         free_ast(node->data.binary.right);
+        break;
+    case AST_BLOCK:
+        for (int i = 0; i < node->data.block.count; i++)
+            free_ast(node->data.block.statements[i]);
+        free(node->data.block.statements);
         break;
     default:
         break;

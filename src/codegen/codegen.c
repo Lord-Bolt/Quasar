@@ -226,6 +226,17 @@ static void emit_statement(ASTNode *node, FILE *out, int indent_level)
         fprintf(out, ";\n");
         break;
 
+    case AST_BLOCK:
+        indent(out, indent_level);
+        fprintf(out, "{\n");
+        for (int i = 0; i < node->data.block.count; i++)
+        {
+            emit_statement(node->data.block.statements[i], out, indent_level + 1);
+        }
+        indent(out, indent_level);
+        fprintf(out, "}\n");
+        break; // <-- add this
+
     default:
         fprintf(stderr, "Error : unknown statement type %d\n", node->type);
         exit(1);
