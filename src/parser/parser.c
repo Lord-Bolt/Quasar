@@ -9,6 +9,11 @@
 
 static ASTNode *parse_expression(void);
 static ASTNode *parse_statement(void);
+static ASTNode *parse_primary(void);
+static ASTNode *parse_unary(void);
+static ASTNode *parse_relational(void);
+static ASTNode *parse_logical_and(void);
+static ASTNode *parse_logical_or(void);
 
 static int parse_errors = 0;
 
@@ -57,6 +62,21 @@ static VarType infer_type(ASTNode *node)
     }
 }
 
+static bool check_unary_types(UnaryOp op, ASTNode *operand)
+{
+    VarType t = infer_type(operand);
+    if (op == UNARY_NOT)
+    {
+        if (t != TYPE_INT && t != TYPE_FLOAT && t != TYPE_BOOL)
+        {
+            fprintf(stderr, "Error: invalid operand type for '!': %s\n", ctype_string(t));
+            parse_errors++;
+            return false;
+        }
+    }
+    return true;
+}
+
 static bool valid_binary_types(VarType left, VarType right, BinaryOp op)
 {
     switch (op)
@@ -81,6 +101,10 @@ static bool valid_binary_types(VarType left, VarType right, BinaryOp op)
     case OP_GE:
         return (left == TYPE_INT || left == TYPE_FLOAT) &&
                (right == TYPE_INT || right == TYPE_FLOAT);
+    case OP_AND:
+    case OP_OR:
+        return (left == TYPE_INT || left == TYPE_FLOAT || left == TYPE_BOOL) &&
+               (right == TYPE_INT || right == TYPE_FLOAT || right == TYPE_BOOL);
     default:
         return false;
     }
@@ -230,6 +254,12 @@ const char *token_name(QTokenType type)
         return "end of file";
     case QTOKEN_UNKNOWN:
         return "unknown token";
+    case QTOKEN_AND:
+        return "'&&'";
+    case QTOKEN_OR:
+        return "'||'";
+    case QTOKEN_NOT:
+        return "'!'";
     default:
         return "???";
     }
@@ -271,6 +301,74 @@ static bool expect(QTokenType type, const char *context)
 }
 
 // ---Recursive Descent Fuctions---
+static ASTNode *parse_unary(void)
+{
+    if (g_current.type == QTOKEN_NOT)
+    {
+        advance();
+        ASTNode *operand = parse_unary(); // right‑associative
+        if (!operand)
+            return NULL;
+        ASTNode *node = make_unary(UNARY_NOT, operand);
+        if (!check_unary_types(UNARY_NOT, node->data.unary.operand))
+        {
+            free_ast(node);
+            return NULL;
+        }
+        return node;
+    }
+    return parse_primary();
+}
+
+static ASTNode *parse_logical_and(void)
+{
+    ASTNode *node = parse_relational();
+    if (!node)
+        return NULL;
+    while (g_current.type == QTOKEN_AND)
+    {
+        advance();
+        ASTNode *right = parse_relational();
+        if (!right)
+        {
+            free_ast(node);
+            return NULL;
+        }
+        node = make_binary(OP_AND, node, right);
+        // type check
+        if (!check_binary_types(OP_AND, node->data.binary.left, node->data.binary.right))
+        {
+            free_ast(node);
+            return NULL;
+        }
+    }
+    return node;
+}
+
+static ASTNode *parse_logical_or(void)
+{
+    ASTNode *node = parse_logical_and();
+    if (!node)
+        return NULL;
+    while (g_current.type == QTOKEN_OR)
+    {
+        advance();
+        ASTNode *right = parse_logical_and();
+        if (!right)
+        {
+            free_ast(node);
+            return NULL;
+        }
+        node = make_binary(OP_OR, node, right);
+        if (!check_binary_types(OP_OR, node->data.binary.left, node->data.binary.right))
+        {
+            free_ast(node);
+            return NULL;
+        }
+    }
+    return node;
+}
+
 static ASTNode *parse_block(void)
 {
     // Expect '{'
@@ -569,7 +667,7 @@ static ASTNode *parse_statement(void)
 
 static ASTNode *parse_multiplicative(void)
 {
-    ASTNode *node = parse_primary();
+    ASTNode *node = parse_unary();
     if (!node)
         return NULL;
     while (g_current.type == QTOKEN_STAR || g_current.type == QTOKEN_SLASH ||
@@ -598,7 +696,7 @@ static ASTNode *parse_multiplicative(void)
             break;
         }
         advance(); // consume operator
-        ASTNode *right = parse_primary();
+        ASTNode *right = parse_unary();
         if (!right)
         {
             free_ast(node);
@@ -691,10 +789,9 @@ static ASTNode *parse_relational(void)
     return node;
 }
 
-// redefine parse_expression to start at the lowest precedence (additive)
 static ASTNode *parse_expression(void)
 {
-    return parse_relational();
+    return parse_logical_or(); // lowest precedence;
 }
 
 ASTNode *parse_program(const char *source)

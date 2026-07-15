@@ -31,9 +31,9 @@ static VarType infer_type(ASTNode *node)
         VarType left = infer_type(node->data.binary.left);
         VarType right = infer_type(node->data.binary.right);
         BinaryOp op = node->data.binary.op;
-        if (op == OP_EQ || op == OP_NE || op == OP_LT || op == OP_GT || op == OP_LE || op == OP_GE)
+        if (op == OP_EQ || op == OP_NE || op == OP_LT || op == OP_GT || op == OP_LE || op == OP_GE || op == OP_AND || op == OP_OR)
         {
-            return TYPE_BOOL; // results are 0 or 1
+            return TYPE_BOOL;
         }
 
         if (op == OP_POW)
@@ -47,10 +47,12 @@ static VarType infer_type(ASTNode *node)
                 return TYPE_FLOAT;
             return TYPE_INT; // both ints -> int
         }
-        // For future operators (relational, logical), they will return TYPE_BOOL (int).
-        // We'll handle them when we add those operators.
         return TYPE_INT; // fallback
     }
+    case AST_UNARY:
+        if (node->data.unary.op == UNARY_NOT)
+            return TYPE_BOOL;
+        return TYPE_INT; // <- caused me mental damage
 
     default:
         return TYPE_INT; // safe fallback for any unknown node
@@ -87,6 +89,10 @@ static const char *op_to_cstring(BinaryOp op)
         return "<=";
     case OP_GE:
         return ">=";
+    case OP_AND:
+        return "&&";
+    case OP_OR:
+        return "||";
     default:
         return "???";
     }
@@ -366,6 +372,20 @@ static void emit_expression(ASTNode *node, FILE *out)
             fprintf(out, " %s ", op_to_cstring(node->data.binary.op));
             emit_expression(node->data.binary.right, out);
             fprintf(out, ")");
+        }
+        break;
+    }
+    case AST_UNARY:
+    {
+        if (node->data.unary.op == UNARY_NOT)
+        {
+            fprintf(out, "!((");
+            emit_expression(node->data.unary.operand, out);
+            fprintf(out, "))");
+        }
+        else
+        {
+            fprintf(stderr, "Unknown unary operator\n");
         }
         break;
     }

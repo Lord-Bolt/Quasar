@@ -457,11 +457,9 @@ Token get_next_token(const char *source, int *pos)
             Token t = {.type = QTOKEN_NOT_EQ, .value = 0, .str = NULL};
             return t;
         }
-
         else
         {
-            // bare '!' is not (yet) supported
-            Token t = {.type = QTOKEN_UNKNOWN, .value = 0, .str = NULL};
+            Token t = {.type = QTOKEN_NOT, .value = 0, .str = NULL};
             return t;
         }
     case '{':
@@ -474,6 +472,34 @@ Token get_next_token(const char *source, int *pos)
         (*pos)++;
         {
             Token t = {.type = QTOKEN_RBRACE, .value = 0, .str = NULL};
+            return t;
+        }
+    case '&':
+        (*pos)++;
+        if (source[*pos] == '&')
+        {
+            (*pos)++;
+            Token t = {.type = QTOKEN_AND, .value = 0, .str = NULL};
+            return t;
+        }
+        else
+        {
+            // bitwise & not yet supported
+            Token t = {.type = QTOKEN_UNKNOWN, .value = 0, .str = NULL};
+            return t;
+        }
+    case '|':
+        (*pos)++;
+        if (source[*pos] == '|')
+        {
+            (*pos)++;
+            Token t = {.type = QTOKEN_OR, .value = 0, .str = NULL};
+            return t;
+        }
+        else
+        {
+            // bitwise | not yet supported
+            Token t = {.type = QTOKEN_UNKNOWN, .value = 0, .str = NULL};
             return t;
         }
     }

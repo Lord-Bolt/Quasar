@@ -39,6 +39,9 @@ typedef enum
     QTOKEN_GT_EQ,     // >=
     QTOKEN_EQ_EQ,     // ==
     QTOKEN_NOT_EQ,    // !=
+    QTOKEN_AND,       // &&
+    QTOKEN_OR,        // ||
+    QTOKEN_NOT,       // ! (unary not)
     QTOKEN_UNKNOWN
 } QTokenType;
 

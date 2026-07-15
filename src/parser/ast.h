@@ -15,6 +15,7 @@ typedef enum
     AST_ASSIGN,
     AST_PROGRAM,
     AST_BINARY,
+    AST_UNARY,
     AST_BLOCK
 } ASTNodeType;
 
@@ -32,8 +33,15 @@ typedef enum
     OP_LT,
     OP_GT,
     OP_LE,
-    OP_GE
+    OP_GE,
+    OP_AND,
+    OP_OR
 } BinaryOp;
+
+typedef enum
+{
+    UNARY_NOT, // !
+} UnaryOp;
 
 typedef struct ASTNode
 {
@@ -86,6 +94,12 @@ typedef struct ASTNode
             int count;
             int capacity;
         } block; // for AST_BLOCK
+
+        struct
+        {
+            UnaryOp op;
+            struct ASTNode *operand; // for unary operations
+        } unary;
     } data;
 } ASTNode;
 
@@ -101,8 +115,9 @@ ASTNode *make_variable(const char *name);
 ASTNode *make_assign(const char *name, ASTNode *value);
 ASTNode *make_binary(BinaryOp op, ASTNode *left, ASTNode *right);
 ASTNode *make_block(void);
+ASTNode *make_unary(UnaryOp op, ASTNode *operand);
 
-void block_add_statement(ASTNode *block, ASTNode *stmt);
+void block_add_statement(ASTNode *block, ASTNode *stmt);       // allows {...} to be used
 void print_add_expression(ASTNode *print_node, ASTNode *expr); // add an expression to the print node
 void program_add_statement(ASTNode *program, ASTNode *stmt);   // adds a child to the program
 void free_ast(ASTNode *node);

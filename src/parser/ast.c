@@ -202,7 +202,18 @@ void block_add_statement(ASTNode *block, ASTNode *stmt)
     block->data.block.statements[block->data.block.count++] = stmt;
 }
 
-// Update free_ast to handle AST_PROGRAM
+// for unary ops - !, &, |
+ASTNode *make_unary(UnaryOp op, ASTNode *operand)
+{
+    ASTNode *node = malloc(sizeof(ASTNode));
+    if (!node)
+        return NULL;
+    node->type = AST_UNARY;
+    node->data.unary.op = op;
+    node->data.unary.operand = operand;
+    return node;
+}
+
 void free_ast(ASTNode *node)
 {
     if (!node)
@@ -245,6 +256,9 @@ void free_ast(ASTNode *node)
         for (int i = 0; i < node->data.block.count; i++)
             free_ast(node->data.block.statements[i]);
         free(node->data.block.statements);
+        break;
+    case AST_UNARY:
+        free_ast(node->data.unary.operand);
         break;
     default:
         break;
