@@ -201,6 +201,22 @@ Token get_next_token(const char *source, int *pos)
     }
     char current = source[*pos];
 
+    // Skip block comments
+    if (source[*pos] == '/' && source[*pos + 1] == '*')
+    {
+        (*pos) += 2; // skip the '/*'
+        while (source[*pos] != '\0' && !(source[*pos] == '*' && source[*pos + 1] == '/'))
+        {
+            (*pos)++;
+        }
+        if (source[*pos] == '*')
+        {
+            (*pos) += 2; // skip the '*/'
+        }
+        // Restart tokenizing (skip whitespace again, etc.)
+        return get_next_token(source, pos);
+    }
+
     // EOF
     if (current == '\0')
     {
