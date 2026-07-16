@@ -16,7 +16,8 @@ typedef enum
     AST_PROGRAM,
     AST_BINARY,
     AST_UNARY,
-    AST_BLOCK
+    AST_BLOCK,
+    AST_IF
 } ASTNodeType;
 
 typedef enum
@@ -102,6 +103,13 @@ typedef struct ASTNode
             UnaryOp op;
             struct ASTNode *operand; // for unary operations
         } unary;
+
+        struct
+        {
+            struct ASTNode *condition; // the if-condition expression
+            struct ASTNode *body;      // block to execute if true
+            struct ASTNode *next;      // linked list of elif/else parts (could be another AST_IF)
+        } ifelse;
     } data;
 } ASTNode;
 
@@ -118,6 +126,7 @@ ASTNode *make_assign(const char *name, ASTNode *value);
 ASTNode *make_binary(BinaryOp op, ASTNode *left, ASTNode *right);
 ASTNode *make_block(void);
 ASTNode *make_unary(UnaryOp op, ASTNode *operand);
+ASTNode *make_if(ASTNode *condition, ASTNode *body, ASTNode *next);
 
 void block_add_statement(ASTNode *block, ASTNode *stmt);       // allows {...} to be used
 void print_add_expression(ASTNode *print_node, ASTNode *expr); // add an expression to the print node

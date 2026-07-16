@@ -214,6 +214,19 @@ ASTNode *make_unary(UnaryOp op, ASTNode *operand)
     return node;
 }
 
+// for if...elif...else
+ASTNode *make_if(ASTNode *condition, ASTNode *body, ASTNode *next)
+{
+    ASTNode *node = malloc(sizeof(ASTNode));
+    if (!node)
+        return NULL;
+    node->type = AST_IF;
+    node->data.ifelse.condition = condition;
+    node->data.ifelse.body = body;
+    node->data.ifelse.next = next;
+    return node;
+}
+
 void free_ast(ASTNode *node)
 {
     if (!node)
@@ -259,6 +272,11 @@ void free_ast(ASTNode *node)
         break;
     case AST_UNARY:
         free_ast(node->data.unary.operand);
+        break;
+    case AST_IF:
+        free_ast(node->data.ifelse.condition);
+        free_ast(node->data.ifelse.body);
+        free_ast(node->data.ifelse.next);
         break;
     default:
         break;

@@ -2,6 +2,7 @@
 #include "symtab/symtab.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 static void emit_statement(ASTNode *node, FILE *out, int indent);
 static void emit_expression(ASTNode *node, FILE *out);
@@ -241,6 +242,32 @@ static void emit_statement(ASTNode *node, FILE *out, int indent_level)
         indent(out, indent_level);
         fprintf(out, "}\n");
         break; // <-- add this
+
+    case AST_IF:
+    {
+        ASTNode *current = node;
+        bool first = true;
+        while (current)
+        {
+            if (current->data.ifelse.condition)
+            {
+                indent(out, indent_level);
+                fprintf(out, "%s (", first ? "if" : "else if");
+                emit_expression(current->data.ifelse.condition, out);
+                fprintf(out, ")\n");
+                emit_statement(current->data.ifelse.body, out, indent_level);
+            }
+            else
+            {
+                indent(out, indent_level);
+                fprintf(out, "else\n");
+                emit_statement(current->data.ifelse.body, out, indent_level);
+            }
+            first = false;
+            current = current->data.ifelse.next;
+        }
+        break;
+    }
 
     default:
         fprintf(stderr, "Error : unknown statement type %d\n", node->type);

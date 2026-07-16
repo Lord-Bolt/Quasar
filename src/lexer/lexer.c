@@ -25,6 +25,12 @@ static QTokenType check_keyword(const char *word)
         return QTOKEN_TYPE_CHAR;
     if (strcmp(word, "bool") == 0)
         return QTOKEN_TYPE_BOOL;
+    if (strcmp(word, "if") == 0)
+        return QTOKEN_IF;
+    if (strcmp(word, "elif") == 0)
+        return QTOKEN_ELIF;
+    if (strcmp(word, "else") == 0)
+        return QTOKEN_ELSE;
     return QTOKEN_UNKNOWN; // not a keyword, to indentify err
 }
 

@@ -14,6 +14,8 @@ static ASTNode *parse_unary(void);
 static ASTNode *parse_relational(void);
 static ASTNode *parse_logical_and(void);
 static ASTNode *parse_logical_or(void);
+static ASTNode *parse_block(void);
+static ASTNode *parse_if_statement(void);
 
 static int parse_errors = 0;
 
@@ -270,6 +272,12 @@ const char *token_name(QTokenType type)
         return "'||'";
     case QTOKEN_NOT:
         return "'!'";
+    case QTOKEN_IF:
+        return "'if'";
+    case QTOKEN_ELIF:
+        return "'elif'";
+    case QTOKEN_ELSE:
+        return "'else'";
     default:
         return "???";
     }
@@ -311,6 +319,111 @@ static bool expect(QTokenType type, const char *context)
 }
 
 // ---Recursive Descent Fuctions---
+static ASTNode *parse_if_statement(void)
+{
+    advance(); // consume 'if'
+
+    if (!expect(QTOKEN_LPAREN, "expected '(' after 'if'"))
+        return NULL;
+
+    ASTNode *condition = parse_expression();
+    if (!condition)
+        return NULL;
+
+    if (!expect(QTOKEN_RPAREN, "expected ')' after condition"))
+    {
+        free_ast(condition);
+        return NULL;
+    }
+
+    if (g_current.type != QTOKEN_LBRACE)
+    {
+        fprintf(stderr, "Error: expected '{' for if body (blocks are required)\n");
+        parse_errors++;
+        free_ast(condition);
+        return NULL;
+    }
+
+    ASTNode *body = parse_block();
+    if (!body)
+    {
+        free_ast(condition);
+        return NULL;
+    }
+
+    ASTNode *current_if = make_if(condition, body, NULL);
+    ASTNode *head = current_if;
+
+    while (g_current.type == QTOKEN_ELIF || g_current.type == QTOKEN_ELSE)
+    {
+        if (g_current.type == QTOKEN_ELIF)
+        {
+            advance(); // consume 'elif'
+
+            if (!expect(QTOKEN_LPAREN, "expected '(' after 'elif'"))
+            {
+                free_ast(head);
+                return NULL;
+            }
+            ASTNode *elif_condition = parse_expression();
+            if (!elif_condition)
+            {
+                free_ast(head);
+                return NULL;
+            }
+            if (!expect(QTOKEN_RPAREN, "expected ')' after elif condition"))
+            {
+                free_ast(elif_condition);
+                free_ast(head);
+                return NULL;
+            }
+            if (g_current.type != QTOKEN_LBRACE)
+            {
+                fprintf(stderr, "Error: expected '{' for elif body (blocks are required)\n");
+                parse_errors++;
+                free_ast(elif_condition);
+                free_ast(head);
+                return NULL;
+            }
+            ASTNode *elif_body = parse_block();
+            if (!elif_body)
+            {
+                free_ast(elif_condition);
+                free_ast(head);
+                return NULL;
+            }
+
+            ASTNode *elif_node = make_if(elif_condition, elif_body, NULL);
+            current_if->data.ifelse.next = elif_node;
+            current_if = elif_node;
+        }
+        else if (g_current.type == QTOKEN_ELSE)
+        {
+            advance(); // consume 'else'
+
+            if (g_current.type != QTOKEN_LBRACE)
+            {
+                fprintf(stderr, "Error: expected '{' for else body (blocks are required)\n");
+                parse_errors++;
+                free_ast(head);
+                return NULL;
+            }
+            ASTNode *else_body = parse_block();
+            if (!else_body)
+            {
+                free_ast(head);
+                return NULL;
+            }
+
+            ASTNode *else_node = make_if(NULL, else_body, NULL);
+            current_if->data.ifelse.next = else_node;
+            break;
+        }
+    }
+
+    return head;
+}
+
 static ASTNode *parse_unary(void)
 {
     if (g_current.type == QTOKEN_NOT)
@@ -695,6 +808,8 @@ static ASTNode *parse_statement(void)
     }
     case QTOKEN_LBRACE:
         return parse_block();
+    case QTOKEN_IF:
+        return parse_if_statement();
     default:
         fprintf(stderr, "Parser error: unexpected token %s at start of statement\n",
                 token_name(g_current.type));
@@ -852,7 +967,7 @@ ASTNode *parse_program(const char *source)
         {
             // Syntax error – skip to next statement
             // Go to the start of the next statement (after the next semicolon)
-            // Skip tokens until we reach a recovery point
+            // Skip tokens until a recovery point
             while (g_current.type != QTOKEN_SEMICOLON &&
                    g_current.type != QTOKEN_EOF &&
                    g_current.type != QTOKEN_PRINT &&
@@ -861,13 +976,10 @@ ASTNode *parse_program(const char *source)
             {
                 advance();
             }
-            // If we stopped at a statement‑start token, we leave it for the next iteration.
-            // If we stopped at a semicolon, consume it and then continue.
             if (g_current.type == QTOKEN_SEMICOLON)
             {
                 advance();
             }
-            // The loop will now try the next statement
         }
     }
     return program;
