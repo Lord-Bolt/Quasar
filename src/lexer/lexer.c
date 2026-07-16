@@ -31,6 +31,12 @@ static QTokenType check_keyword(const char *word)
         return QTOKEN_ELIF;
     if (strcmp(word, "else") == 0)
         return QTOKEN_ELSE;
+    if (strcmp(word, "while") == 0)
+        return QTOKEN_WHILE;
+    if (strcmp(word, "repeat") == 0)
+        return QTOKEN_REPEAT;
+    if (strcmp(word, "until") == 0)
+        return QTOKEN_UNTIL;
     return QTOKEN_UNKNOWN; // not a keyword, to indentify err
 }
 

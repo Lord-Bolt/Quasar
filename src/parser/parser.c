@@ -16,6 +16,8 @@ static ASTNode *parse_logical_and(void);
 static ASTNode *parse_logical_or(void);
 static ASTNode *parse_block(void);
 static ASTNode *parse_if_statement(void);
+static ASTNode *parse_while_statement(void);
+static ASTNode *parse_repeat_until_statement(void);
 
 static int parse_errors = 0;
 
@@ -278,6 +280,12 @@ const char *token_name(QTokenType type)
         return "'elif'";
     case QTOKEN_ELSE:
         return "'else'";
+    case QTOKEN_WHILE:
+        return "'while'";
+    case QTOKEN_REPEAT:
+        return "'repeat'";
+    case QTOKEN_UNTIL:
+        return "'until'";
     default:
         return "???";
     }
@@ -422,6 +430,94 @@ static ASTNode *parse_if_statement(void)
     }
 
     return head;
+}
+
+static ASTNode *parse_while_statement(void)
+{
+    advance(); // consume 'while'
+
+    if (!expect(QTOKEN_LPAREN, "expected '(' after 'while'"))
+        return NULL;
+
+    ASTNode *condition = parse_expression();
+    if (!condition)
+        return NULL;
+
+    if (!expect(QTOKEN_RPAREN, "expected ')' after condition"))
+    {
+        free_ast(condition);
+        return NULL;
+    }
+
+    if (g_current.type != QTOKEN_LBRACE)
+    {
+        fprintf(stderr, "Error: expected '{' for while body (blocks are required)\n");
+        parse_errors++;
+        free_ast(condition);
+        return NULL;
+    }
+
+    ASTNode *body = parse_block();
+    if (!body)
+    {
+        free_ast(condition);
+        return NULL;
+    }
+
+    return make_while(condition, body);
+}
+
+static ASTNode *parse_repeat_until_statement(void)
+{
+    advance(); // consume 'repeat'
+
+    if (g_current.type != QTOKEN_LBRACE)
+    {
+        fprintf(stderr, "Error: expected '{' for repeat body (blocks are required)\n");
+        parse_errors++;
+        return NULL;
+    }
+
+    ASTNode *body = parse_block();
+    if (!body)
+        return NULL;
+
+    // Must have 'until'
+    if (!expect(QTOKEN_UNTIL, "expected 'until' after repeat block"))
+    {
+        free_ast(body);
+        return NULL;
+    }
+
+    if (!expect(QTOKEN_LPAREN, "expected '(' after 'until'"))
+    {
+        free_ast(body);
+        return NULL;
+    }
+
+    ASTNode *condition = parse_expression();
+    if (!condition)
+    {
+        free_ast(body);
+        return NULL;
+    }
+
+    if (!expect(QTOKEN_RPAREN, "expected ')' after until condition"))
+    {
+        free_ast(condition);
+        free_ast(body);
+        return NULL;
+    }
+
+    // Optional semicolon after until for consistency
+    if (!expect(QTOKEN_SEMICOLON, "expected ';' after until clause"))
+    {
+        free_ast(condition);
+        free_ast(body);
+        return NULL;
+    }
+
+    return make_repeat_until(condition, body);
 }
 
 static ASTNode *parse_unary(void)
@@ -810,6 +906,10 @@ static ASTNode *parse_statement(void)
         return parse_block();
     case QTOKEN_IF:
         return parse_if_statement();
+    case QTOKEN_WHILE:
+        return parse_while_statement();
+    case QTOKEN_REPEAT:
+        return parse_repeat_until_statement();
     default:
         fprintf(stderr, "Parser error: unexpected token %s at start of statement\n",
                 token_name(g_current.type));

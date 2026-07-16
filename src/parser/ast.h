@@ -17,7 +17,9 @@ typedef enum
     AST_BINARY,
     AST_UNARY,
     AST_BLOCK,
-    AST_IF
+    AST_IF,
+    AST_WHILE,
+    AST_REPEAT_UNTIL,
 } ASTNodeType;
 
 typedef enum
@@ -110,6 +112,17 @@ typedef struct ASTNode
             struct ASTNode *body;      // block to execute if true
             struct ASTNode *next;      // linked list of elif/else parts (could be another AST_IF)
         } ifelse;
+
+        struct
+        {
+            struct ASTNode *condition;
+            struct ASTNode *body;
+        } whileloop; // for AST_WHILE
+        struct
+        {
+            struct ASTNode *condition;
+            struct ASTNode *body;
+        } repeatuntil; // for AST_REPEAT_UNTIL
     } data;
 } ASTNode;
 
@@ -127,6 +140,8 @@ ASTNode *make_binary(BinaryOp op, ASTNode *left, ASTNode *right);
 ASTNode *make_block(void);
 ASTNode *make_unary(UnaryOp op, ASTNode *operand);
 ASTNode *make_if(ASTNode *condition, ASTNode *body, ASTNode *next);
+ASTNode *make_while(ASTNode *condition, ASTNode *body);
+ASTNode *make_repeat_until(ASTNode *condition, ASTNode *body);
 
 void block_add_statement(ASTNode *block, ASTNode *stmt);       // allows {...} to be used
 void print_add_expression(ASTNode *print_node, ASTNode *expr); // add an expression to the print node

@@ -241,7 +241,7 @@ static void emit_statement(ASTNode *node, FILE *out, int indent_level)
         }
         indent(out, indent_level);
         fprintf(out, "}\n");
-        break; // <-- add this
+        break; // <-- gave me mental torture
 
     case AST_IF:
     {
@@ -266,6 +266,28 @@ static void emit_statement(ASTNode *node, FILE *out, int indent_level)
             first = false;
             current = current->data.ifelse.next;
         }
+        break;
+    }
+
+    case AST_WHILE:
+    {
+        indent(out, indent_level);
+        fprintf(out, "while (");
+        emit_expression(node->data.whileloop.condition, out);
+        fprintf(out, ")\n");
+        emit_statement(node->data.whileloop.body, out, indent_level);
+        break;
+    }
+
+    case AST_REPEAT_UNTIL:
+    {
+        indent(out, indent_level);
+        fprintf(out, "do\n");
+        emit_statement(node->data.repeatuntil.body, out, indent_level);
+        indent(out, indent_level);
+        fprintf(out, "while (!(");
+        emit_expression(node->data.repeatuntil.condition, out);
+        fprintf(out, "));\n");
         break;
     }
 

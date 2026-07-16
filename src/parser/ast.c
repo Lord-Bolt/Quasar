@@ -227,6 +227,29 @@ ASTNode *make_if(ASTNode *condition, ASTNode *body, ASTNode *next)
     return node;
 }
 
+// for while and repeat...until
+ASTNode *make_while(ASTNode *condition, ASTNode *body)
+{
+    ASTNode *node = malloc(sizeof(ASTNode));
+    if (!node)
+        return NULL;
+    node->type = AST_WHILE;
+    node->data.whileloop.condition = condition;
+    node->data.whileloop.body = body;
+    return node;
+}
+
+ASTNode *make_repeat_until(ASTNode *condition, ASTNode *body)
+{
+    ASTNode *node = malloc(sizeof(ASTNode));
+    if (!node)
+        return NULL;
+    node->type = AST_REPEAT_UNTIL;
+    node->data.repeatuntil.condition = condition;
+    node->data.repeatuntil.body = body;
+    return node;
+}
+
 void free_ast(ASTNode *node)
 {
     if (!node)
@@ -277,6 +300,14 @@ void free_ast(ASTNode *node)
         free_ast(node->data.ifelse.condition);
         free_ast(node->data.ifelse.body);
         free_ast(node->data.ifelse.next);
+        break;
+    case AST_WHILE:
+        free_ast(node->data.whileloop.condition);
+        free_ast(node->data.whileloop.body);
+        break;
+    case AST_REPEAT_UNTIL:
+        free_ast(node->data.repeatuntil.condition);
+        free_ast(node->data.repeatuntil.body);
         break;
     default:
         break;
