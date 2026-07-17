@@ -319,6 +319,20 @@ const char *token_name(QTokenType type)
         return "'++'";
     case QTOKEN_DEC:
         return "'--'";
+    case QTOKEN_PLUS_EQ:
+        return "'+='";
+    case QTOKEN_MINUS_EQ:
+        return "'-='";
+    case QTOKEN_STAR_EQ:
+        return "'*='";
+    case QTOKEN_SLASH_EQ:
+        return "'/='";
+    case QTOKEN_MOD_EQ:
+        return "'%%='";
+    case QTOKEN_POW_EQ:
+        return "'**='";
+    case QTOKEN_FLDIV_EQ:
+        return "'//='";
     default:
         return "???";
     }
@@ -963,24 +977,112 @@ static ASTNode *parse_statement(void)
         return parse_let_statement();
     case QTOKEN_IDENTIFIER:
     {
-        // Save the identifier name
         char *name = strdup(g_current.str);
-        advance(); // consume identifier, Check if followed by '='
+        advance(); // consume identifier
+
+        // Check for compound assignment tokens first
+        BinaryOp compound_op;
+        bool is_compound = false;
+        switch (g_current.type)
+        {
+        case QTOKEN_PLUS_EQ:
+            compound_op = OP_ADD;
+            is_compound = true;
+            break;
+        case QTOKEN_MINUS_EQ:
+            compound_op = OP_SUB;
+            is_compound = true;
+            break;
+        case QTOKEN_STAR_EQ:
+            compound_op = OP_MUL;
+            is_compound = true;
+            break;
+        case QTOKEN_SLASH_EQ:
+            compound_op = OP_DIV;
+            is_compound = true;
+            break;
+        case QTOKEN_MOD_EQ:
+            compound_op = OP_MOD;
+            is_compound = true;
+            break;
+        case QTOKEN_POW_EQ:
+            compound_op = OP_POW;
+            is_compound = true;
+            break;
+        case QTOKEN_FLDIV_EQ:
+            compound_op = OP_FLDIV;
+            is_compound = true;
+            break;
+        default:
+            break;
+        }
+
+        if (is_compound)
+        {
+            advance(); // consume compound token
+            ASTNode *rhs = parse_expression();
+            if (!rhs)
+            {
+                free(name);
+                return NULL;
+            }
+
+            // Build variable node
+            ASTNode *var = make_variable(name); // make_variable duplicates name
+            if (!var)
+            {
+                free(name);
+                free_ast(rhs);
+                return NULL;
+            }
+
+            // Build binary expression: var op rhs
+            ASTNode *binary = make_binary(compound_op, var, rhs);
+            if (!binary)
+            {
+                free_ast(var);
+                free_ast(rhs);
+                free(name);
+                return NULL;
+            }
+
+            // Type check
+            VarType var_type = symtab_lookup(name);
+            VarType expr_type = infer_type(binary);
+            if (!compatible_assignment(var_type, expr_type))
+            {
+                fprintf(stderr, "Error: type mismatch in compound assignment to '%s' – expected %s but got %s\n",
+                        name, ctype_string(var_type), ctype_string(expr_type));
+                parse_errors++;
+                free_ast(binary);
+                free(name);
+                return NULL;
+            }
+
+            // Build assignment: name = binary
+            ASTNode *assign = make_assign(name, binary);
+            free(name);
+            if (!expect(QTOKEN_SEMICOLON, "expected ';' after compound assignment"))
+            {
+                free_ast(assign);
+                return NULL;
+            }
+            return assign;
+        }
+
+        // If not compound, must be simple assignment (expect '=')
         if (g_current.type == QTOKEN_EQUALS)
         {
             ASTNode *assign = parse_assignment(name);
             free(name);
             return assign;
         }
-        else
-        {
-            // Not an assignment; perhaps a function call later? For now, error.
-            fprintf(stderr, "Unexpected token after identifier '%s' (expected '=' for assignment)\n", name);
-            free(name);
-            // Skip to next statement? We'll just return NULL to trigger recovery.
-            return NULL;
-        }
-        break;
+
+        // Neither assignment nor compound – error
+        fprintf(stderr, "Unexpected token after identifier '%s' (expected '=' or compound assignment)\n", name);
+        parse_errors++;
+        free(name);
+        return NULL;
     }
     case QTOKEN_LBRACE:
         return parse_block();

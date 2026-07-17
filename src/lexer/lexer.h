@@ -48,8 +48,15 @@ typedef enum
     QTOKEN_WHILE,
     QTOKEN_REPEAT, // for do-while
     QTOKEN_UNTIL,
-    QTOKEN_INC, // for ++
-    QTOKEN_DEC, // for --
+    QTOKEN_INC,      // for ++
+    QTOKEN_DEC,      // for --
+    QTOKEN_PLUS_EQ,  // for +=
+    QTOKEN_MINUS_EQ, // for -=
+    QTOKEN_STAR_EQ,  // for *=
+    QTOKEN_SLASH_EQ, // for /=
+    QTOKEN_MOD_EQ,   // for %=
+    QTOKEN_POW_EQ,   // for **=
+    QTOKEN_FLDIV_EQ, // for //=
     QTOKEN_UNKNOWN
 } QTokenType;
 
