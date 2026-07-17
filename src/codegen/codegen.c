@@ -142,30 +142,10 @@ void generate_code(ASTNode *program, FILE *out)
     fprintf(out, "#include <math.h>\n\n");
     fprintf(out, "int main(void) {\n");
 
-    // First pass: emit all variable declarations (AST_LET)
+    // Just emit all statements in order – let blocks handle nesting
     for (int i = 0; i < program->data.program.count; i++)
     {
-        ASTNode *stmt = program->data.program.statements[i];
-        if (stmt->type == AST_LET)
-        {
-            fprintf(out, "    %s %s", ctype_string(stmt->data.let.vartype), stmt->data.let.name);
-            if (stmt->data.let.init)
-            {
-                fprintf(out, " = ");
-                emit_expression(stmt->data.let.init, out);
-            }
-            fprintf(out, ";\n");
-        }
-    }
-
-    // Second pass: emit all other statements (print, etc.)
-    for (int i = 0; i < program->data.program.count; i++)
-    {
-        ASTNode *stmt = program->data.program.statements[i];
-        if (stmt->type != AST_LET)
-        {
-            emit_statement(stmt, out, 1);
-        }
+        emit_statement(program->data.program.statements[i], out, 1);
     }
 
     fprintf(out, "    return 0;\n");
@@ -226,7 +206,16 @@ static void emit_statement(ASTNode *node, FILE *out, int indent_level)
     }
 
     case AST_LET:
-        // already handled in declarations
+        indent(out, indent_level);
+        fprintf(out, "%s %s", ctype_string(node->data.let.vartype),
+                node->data.let.name);
+        if (node->data.let.init)
+        {
+            fprintf(out, " = ");
+            emit_expression(node->data.let.init, out);
+        }
+        fprintf(out, ";\n");
+        break;
         break;
 
     case AST_ASSIGN:

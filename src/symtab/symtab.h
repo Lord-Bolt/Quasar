@@ -10,6 +10,8 @@ typedef enum
     TYPE_BOOL
 } VarType;
 
+void symtab_push_scope(void);
+void symtab_pop_scope(void);
 void symtab_add(const char *name, VarType type);
 VarType symtab_lookup(const char *name);
 const char *ctype_string(VarType type);

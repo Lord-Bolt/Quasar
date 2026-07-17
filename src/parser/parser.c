@@ -711,21 +711,22 @@ static ASTNode *parse_logical_or(void)
 
 static ASTNode *parse_block(void)
 {
-    // Expect '{'
     if (!expect(QTOKEN_LBRACE, "expected '{' to start block"))
         return NULL;
-    ASTNode *block = make_block();
+    symtab_push_scope(); // NEW
 
+    ASTNode *block = make_block();
     while (g_current.type != QTOKEN_RBRACE && g_current.type != QTOKEN_EOF)
     {
         ASTNode *stmt = parse_statement();
         if (!stmt)
         {
-            // Error recovery inside block: skip to next '}' or statement-start
+            // error recovery: skip to next '}'
             while (g_current.type != QTOKEN_RBRACE && g_current.type != QTOKEN_EOF)
                 advance();
             if (g_current.type == QTOKEN_RBRACE)
                 advance();
+            symtab_pop_scope(); // cleanup
             free_ast(block);
             return NULL;
         }
@@ -734,9 +735,12 @@ static ASTNode *parse_block(void)
 
     if (!expect(QTOKEN_RBRACE, "expected '}' to close block"))
     {
+        symtab_pop_scope();
         free_ast(block);
         return NULL;
     }
+
+    symtab_pop_scope(); // NEW – block ends
     return block;
 }
 
@@ -1236,6 +1240,7 @@ ASTNode *parse_program(const char *source)
     advance();
 
     ASTNode *program = make_program();
+    symtab_push_scope(); // global scope
 
     while (g_current.type != QTOKEN_EOF)
     {
@@ -1264,5 +1269,6 @@ ASTNode *parse_program(const char *source)
             }
         }
     }
+    symtab_pop_scope(); // close global scope
     return program;
 }
