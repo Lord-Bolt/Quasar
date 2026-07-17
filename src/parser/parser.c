@@ -109,6 +109,17 @@ static bool check_unary_types(UnaryOp op, ASTNode *operand)
     return true;
 }
 
+// Returns true if a value of type `source` can be assigned to a variable of type `target`.
+static bool compatible_assignment(VarType target, VarType source)
+{
+    if (target == source)
+        return true;
+    // Allow implicit int → float
+    if (target == TYPE_FLOAT && source == TYPE_INT)
+        return true;
+    return false;
+}
+
 static bool valid_binary_types(VarType left, VarType right, BinaryOp op)
 {
     switch (op)
@@ -782,7 +793,7 @@ static ASTNode *parse_primary(void)
     return NULL;
 }
 
-static ASTNode *parse_assignment(const char *name)
+static ASTNode *parse_assignment(char *name)
 {
     // name is the variable being assigned (already consumed from the token)
     // Current token should be '='
@@ -804,11 +815,12 @@ static ASTNode *parse_assignment(const char *name)
     // Type check the new value
     VarType var_type = symtab_lookup(name);
     VarType val_type = expr_type(value);
-    if (var_type != val_type)
+    if (!compatible_assignment(var_type, val_type))
     {
-        fprintf(stderr, "Error: type mismatch in assignment to '%s' - expected %s but got %s\n",
+        fprintf(stderr, "Error: type mismatch in assignment to '%s' – expected %s but got %s\n",
                 name, ctype_string(var_type), ctype_string(val_type));
         parse_errors++;
+        free(name);
         free_ast(value);
         return NULL;
     }
@@ -928,7 +940,7 @@ static ASTNode *parse_let_statement(void)
 
     // Type check the initializer
     VarType init_type = expr_type(init);
-    if (init_type != type)
+    if (!compatible_assignment(type, init_type))
     {
         fprintf(stderr, "Error: type mismatch in 'let %s' - expected %s but got %s\n",
                 name, ctype_string(type), ctype_string(init_type));
