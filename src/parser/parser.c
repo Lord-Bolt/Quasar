@@ -18,6 +18,7 @@ static ASTNode *parse_block(void);
 static ASTNode *parse_if_statement(void);
 static ASTNode *parse_while_statement(void);
 static ASTNode *parse_repeat_until_statement(void);
+static ASTNode *parse_postfix(void);
 
 static int parse_errors = 0;
 
@@ -84,6 +85,23 @@ static bool check_unary_types(UnaryOp op, ASTNode *operand)
         {
             fprintf(stderr, "Error: invalid operand type for unary '%c': %s\n",
                     op == UNARY_MINUS ? '-' : '+', ctype_string(t));
+            parse_errors++;
+            return false;
+        }
+    }
+    else if (op == UNARY_PRE_INC || op == UNARY_PRE_DEC ||
+             op == UNARY_POST_INC || op == UNARY_POST_DEC)
+    {
+        // Must be a variable (identifier) and numeric.
+        if (operand->type != AST_VARIABLE)
+        {
+            fprintf(stderr, "Error: increment/decrement operand must be a variable\n");
+            parse_errors++;
+            return false;
+        }
+        if (t != TYPE_INT && t != TYPE_FLOAT)
+        {
+            fprintf(stderr, "Error: invalid operand type for ++/--: %s\n", ctype_string(t));
             parse_errors++;
             return false;
         }
@@ -286,6 +304,10 @@ const char *token_name(QTokenType type)
         return "'repeat'";
     case QTOKEN_UNTIL:
         return "'until'";
+    case QTOKEN_INC:
+        return "'++'";
+    case QTOKEN_DEC:
+        return "'--'";
     default:
         return "???";
     }
@@ -327,6 +349,24 @@ static bool expect(QTokenType type, const char *context)
 }
 
 // ---Recursive Descent Fuctions---
+static ASTNode *parse_postfix(void)
+{
+    ASTNode *node = parse_primary(); // get the operand (identifier, literal, etc.)
+    while (g_current.type == QTOKEN_INC || g_current.type == QTOKEN_DEC)
+    {
+        UnaryOp op = (g_current.type == QTOKEN_INC) ? UNARY_POST_INC : UNARY_POST_DEC;
+        advance(); // consume '++' or '--'
+        node = make_unary(op, node);
+        // Type check the postfix operator
+        if (!check_unary_types(op, node->data.unary.operand))
+        {
+            free_ast(node);
+            return NULL;
+        }
+    }
+    return node;
+}
+
 static ASTNode *parse_if_statement(void)
 {
     advance(); // consume 'if'
@@ -564,7 +604,35 @@ static ASTNode *parse_unary(void)
         }
         return node;
     }
-    return parse_primary();
+    if (g_current.type == QTOKEN_INC)
+    {
+        advance();
+        ASTNode *operand = parse_unary(); // recursive checking
+        if (!operand)
+            return NULL;
+        ASTNode *node = make_unary(UNARY_PRE_INC, operand);
+        if (!check_unary_types(UNARY_PRE_INC, operand))
+        {
+            free_ast(node);
+            return NULL;
+        }
+        return node;
+    }
+    if (g_current.type == QTOKEN_DEC)
+    {
+        advance();
+        ASTNode *operand = parse_unary();
+        if (!operand)
+            return NULL;
+        ASTNode *node = make_unary(UNARY_PRE_DEC, operand);
+        if (!check_unary_types(UNARY_PRE_DEC, operand))
+        {
+            free_ast(node);
+            return NULL;
+        }
+        return node;
+    }
+    return parse_postfix();
 }
 
 static ASTNode *parse_logical_and(void)

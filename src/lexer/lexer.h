@@ -46,8 +46,10 @@ typedef enum
     QTOKEN_ELIF,
     QTOKEN_ELSE,
     QTOKEN_WHILE,
-    QTOKEN_REPEAT,
+    QTOKEN_REPEAT, // for do-while
     QTOKEN_UNTIL,
+    QTOKEN_INC, // for ++
+    QTOKEN_DEC, // for --
     QTOKEN_UNKNOWN
 } QTokenType;
 

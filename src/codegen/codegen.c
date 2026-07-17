@@ -53,7 +53,11 @@ static VarType infer_type(ASTNode *node)
     case AST_UNARY:
         if (node->data.unary.op == UNARY_NOT)
             return TYPE_BOOL;
-        return infer_type(node->data.unary.operand); // unary +/- keep the operand type
+        if (node->data.unary.op == UNARY_PRE_INC || node->data.unary.op == UNARY_PRE_DEC ||
+            node->data.unary.op == UNARY_POST_INC || node->data.unary.op == UNARY_POST_DEC)
+            return infer_type(node->data.unary.operand);
+        return TYPE_INT;
+
     default:
         return TYPE_INT; // <- caused mental damage
     }
@@ -438,8 +442,31 @@ static void emit_expression(ASTNode *node, FILE *out)
         }
         else if (node->data.unary.op == UNARY_PLUS)
         {
-            // Unary plus is a no‑op
             emit_expression(node->data.unary.operand, out);
+        }
+        else if (node->data.unary.op == UNARY_PRE_INC)
+        {
+            fprintf(out, "++(");
+            emit_expression(node->data.unary.operand, out);
+            fprintf(out, ")");
+        }
+        else if (node->data.unary.op == UNARY_PRE_DEC)
+        {
+            fprintf(out, "--(");
+            emit_expression(node->data.unary.operand, out);
+            fprintf(out, ")");
+        }
+        else if (node->data.unary.op == UNARY_POST_INC)
+        {
+            fprintf(out, "(");
+            emit_expression(node->data.unary.operand, out);
+            fprintf(out, ")++");
+        }
+        else if (node->data.unary.op == UNARY_POST_DEC)
+        {
+            fprintf(out, "(");
+            emit_expression(node->data.unary.operand, out);
+            fprintf(out, ")--");
         }
         break;
     default:

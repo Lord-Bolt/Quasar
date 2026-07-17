@@ -401,12 +401,26 @@ Token get_next_token(const char *source, int *pos)
         }
     case '+':
         (*pos)++;
+        if (source[*pos] == '+')
+        { // ++
+            (*pos)++;
+            Token t = {.type = QTOKEN_INC, .value = 0, .str = NULL};
+            return t;
+        }
+        else
         {
             Token t = {.type = QTOKEN_PLUS, .value = 0, .str = NULL};
             return t;
         }
     case '-':
         (*pos)++;
+        if (source[*pos] == '-')
+        { // --
+            (*pos)++;
+            Token t = {.type = QTOKEN_DEC, .value = 0, .str = NULL};
+            return t;
+        }
+        else
         {
             Token t = {.type = QTOKEN_MINUS, .value = 0, .str = NULL};
             return t;
