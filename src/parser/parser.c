@@ -19,7 +19,9 @@ static ASTNode *parse_if_statement(void);
 static ASTNode *parse_while_statement(void);
 static ASTNode *parse_repeat_until_statement(void);
 static ASTNode *parse_postfix(void);
+static ASTNode *parse_for_statement(void);
 
+static VarType expr_type(ASTNode *node);
 static int parse_errors = 0;
 
 static VarType infer_type(ASTNode *node)
@@ -148,6 +150,8 @@ static bool valid_binary_types(VarType left, VarType right, BinaryOp op)
     case OP_OR:
         return (left == TYPE_INT || left == TYPE_FLOAT || left == TYPE_BOOL) &&
                (right == TYPE_INT || right == TYPE_FLOAT || right == TYPE_BOOL);
+    case OP_ASSIGN:
+        return true; // allow any assignment type for now (the parser does finer checks)
     default:
         return false;
     }
@@ -333,6 +337,8 @@ const char *token_name(QTokenType type)
         return "'**='";
     case QTOKEN_FLDIV_EQ:
         return "'//='";
+    case QTOKEN_FOR:
+        return "'for'";
     default:
         return "???";
     }
@@ -369,6 +375,73 @@ static bool expect(QTokenType type, const char *context)
         fprintf(stderr, ", but got %s\n", token_name(g_current.type));
         parse_errors++;
         return false;
+    }
+    return true;
+}
+
+static bool check_assignment_op(BinaryOp op, ASTNode *left, ASTNode *right)
+{
+    // left must be a plain variable (for now)
+    if (left->type != AST_VARIABLE)
+    {
+        fprintf(stderr, "Error: left side of assignment must be a variable\n");
+        parse_errors++;
+        return false;
+    }
+    VarType left_type = symtab_lookup(left->data.varName);
+    VarType right_type = expr_type(right); // infer_type from parser
+
+    // For compound assignment, the operation must also be type‑safe
+    // For +=, -=, etc., both sides must be arithmetic (int/float)
+    if (op != OP_ASSIGN)
+    {
+        // check that the implied binary operation is valid
+        // e.g., i += "hello" should be rejected
+        BinaryOp inner_op;
+        switch (op)
+        {
+        case OP_ADD_ASSIGN:
+            inner_op = OP_ADD;
+            break;
+        case OP_SUB_ASSIGN:
+            inner_op = OP_SUB;
+            break;
+        case OP_MUL_ASSIGN:
+            inner_op = OP_MUL;
+            break;
+        case OP_DIV_ASSIGN:
+            inner_op = OP_DIV;
+            break;
+        case OP_MOD_ASSIGN:
+            inner_op = OP_MOD;
+            break;
+        case OP_POW_ASSIGN:
+            inner_op = OP_POW;
+            break;
+        case OP_FLDIV_ASSIGN:
+            inner_op = OP_FLDIV;
+            break;
+        default:
+            return false;
+        }
+        // reuse your existing arithmetic type‑check
+        if (!valid_binary_types(left_type, right_type, inner_op))
+        {
+            fprintf(stderr, "Error: invalid operand types for compound assignment\n");
+            parse_errors++;
+            return false;
+        }
+    }
+    else
+    {
+        // plain assignment: use compatible_assignment
+        if (!compatible_assignment(left_type, right_type))
+        {
+            fprintf(stderr, "Error: type mismatch in assignment – expected %s but got %s\n",
+                    ctype_string(left_type), ctype_string(right_type));
+            parse_errors++;
+            return false;
+        }
     }
     return true;
 }
@@ -898,6 +971,65 @@ static ASTNode *parse_print_statement(void)
     return print_node;
 }
 
+static ASTNode *parse_assignment_expression(void)
+{
+    ASTNode *left = parse_logical_or();
+    BinaryOp op;
+    bool is_assign = false;
+    switch (g_current.type)
+    {
+    case QTOKEN_PLUS_EQ:
+        op = OP_ADD_ASSIGN;
+        is_assign = true;
+        break;
+    case QTOKEN_MINUS_EQ:
+        op = OP_SUB_ASSIGN;
+        is_assign = true;
+        break;
+    case QTOKEN_STAR_EQ:
+        op = OP_MUL_ASSIGN;
+        is_assign = true;
+        break;
+    case QTOKEN_SLASH_EQ:
+        op = OP_DIV_ASSIGN;
+        is_assign = true;
+        break;
+    case QTOKEN_MOD_EQ:
+        op = OP_MOD_ASSIGN;
+        is_assign = true;
+        break;
+    case QTOKEN_POW_EQ:
+        op = OP_POW_ASSIGN;
+        is_assign = true;
+        break;
+    case QTOKEN_FLDIV_EQ:
+        op = OP_FLDIV_ASSIGN;
+        is_assign = true;
+        break;
+    case QTOKEN_EQUALS:
+        op = OP_ASSIGN;
+        is_assign = true;
+        break;
+    default:
+        break;
+    }
+    if (is_assign)
+    {
+        advance();                                      // consume the operator
+        ASTNode *right = parse_assignment_expression(); // right‑associative
+        ASTNode *node = make_binary(op, left, right);
+
+        // --- type & lvalue check ---
+        if (!check_assignment_op(op, left, right))
+        {
+            free_ast(node);
+            return NULL;
+        }
+        return node;
+    }
+    return left;
+}
+
 static ASTNode *parse_let_statement(void)
 {
     advance(); // consume 'let'
@@ -969,6 +1101,184 @@ static ASTNode *parse_let_statement(void)
     }
 
     return make_let(name, type, init);
+}
+
+// Parses "let name : type = expression" without consuming the trailing semicolon.
+static ASTNode *parse_let_declaration(void)
+{
+    if (g_current.type != QTOKEN_IDENTIFIER)
+    {
+        fprintf(stderr, "Expected variable name after 'let'\n");
+        parse_errors++;
+        return NULL;
+    }
+    char *name = strdup(g_current.str);
+    advance();
+
+    if (!expect(QTOKEN_COLON, "expected ':' after variable name"))
+    {
+        free(name);
+        return NULL;
+    }
+
+    VarType type;
+    if (g_current.type == QTOKEN_TYPE_INT || g_current.type == QTOKEN_TYPE_FLOAT ||
+        g_current.type == QTOKEN_TYPE_STRING || g_current.type == QTOKEN_TYPE_CHAR ||
+        g_current.type == QTOKEN_TYPE_BOOL)
+    {
+        type = token_to_vartype(g_current.type);
+        advance();
+    }
+    else
+    {
+        fprintf(stderr, "Expected type after ':' in let declaration\n");
+        free(name);
+        return NULL;
+    }
+
+    if (!expect(QTOKEN_EQUALS, "expected '=' in let declaration"))
+    {
+        free(name);
+        return NULL;
+    }
+
+    ASTNode *init = parse_expression();
+    if (!init)
+    {
+        free(name);
+        return NULL;
+    }
+
+    // Type check
+    VarType init_type = infer_type(init); // or expr_type(init)
+    if (!compatible_assignment(type, init_type))
+    {
+        fprintf(stderr, "Error: type mismatch in 'let %s' – expected %s but got %s\n",
+                name, ctype_string(type), ctype_string(init_type));
+        parse_errors++;
+        free(name);
+        free_ast(init);
+        return NULL;
+    }
+
+    symtab_add(name, type);
+    return make_let(name, type, init);
+}
+
+static ASTNode *parse_for_statement(void)
+{
+    advance(); // consume 'for'
+    if (!expect(QTOKEN_LPAREN, "expected '(' after 'for'"))
+        return NULL;
+
+    symtab_push_scope(); // loop scope
+
+    // --- init clause (optional) ---
+    ASTNode *init = NULL;
+    if (g_current.type != QTOKEN_SEMICOLON)
+    {
+        if (g_current.type == QTOKEN_LET)
+        {
+            advance(); // consume 'let'
+            init = parse_let_declaration();
+        }
+        else
+        {
+            init = parse_expression(); // e.g. i = 0
+        }
+        if (!init)
+        {
+            symtab_pop_scope();
+            return NULL;
+        }
+    }
+    if (!expect(QTOKEN_SEMICOLON, "expected ';' after for init"))
+    {
+        if (init)
+            free_ast(init);
+        symtab_pop_scope();
+        return NULL;
+    }
+
+    // --- condition (optional) ---
+    ASTNode *condition = NULL;
+    if (g_current.type != QTOKEN_SEMICOLON)
+    {
+        condition = parse_expression();
+        if (!condition)
+        {
+            if (init)
+                free_ast(init);
+            symtab_pop_scope();
+            return NULL;
+        }
+    }
+    if (!expect(QTOKEN_SEMICOLON, "expected ';' after for condition"))
+    {
+        if (init)
+            free_ast(init);
+        if (condition)
+            free_ast(condition);
+        symtab_pop_scope();
+        return NULL;
+    }
+
+    // --- update (optional) ---
+    ASTNode *update = NULL;
+    if (g_current.type != QTOKEN_RPAREN)
+    {
+        update = parse_expression();
+        if (!update)
+        {
+            if (init)
+                free_ast(init);
+            if (condition)
+                free_ast(condition);
+            symtab_pop_scope();
+            return NULL;
+        }
+    }
+    if (!expect(QTOKEN_RPAREN, "expected ')' after for clauses"))
+    {
+        if (init)
+            free_ast(init);
+        if (condition)
+            free_ast(condition);
+        if (update)
+            free_ast(update);
+        symtab_pop_scope();
+        return NULL;
+    }
+
+    // --- body (block) ---
+    if (g_current.type != QTOKEN_LBRACE)
+    {
+        fprintf(stderr, "Error: expected '{' for for body (blocks are required)\n");
+        parse_errors++;
+        if (init)
+            free_ast(init);
+        if (condition)
+            free_ast(condition);
+        if (update)
+            free_ast(update);
+        symtab_pop_scope();
+        return NULL;
+    }
+    ASTNode *body = parse_block();
+    if (!body)
+    {
+        if (init)
+            free_ast(init);
+        if (condition)
+            free_ast(condition);
+        if (update)
+            free_ast(update);
+        symtab_pop_scope();
+        return NULL;
+    }
+
+    symtab_pop_scope(); // end loop scope
+    return make_for(init, condition, update, body);
 }
 
 static ASTNode *parse_statement(void)
@@ -1096,6 +1406,8 @@ static ASTNode *parse_statement(void)
         return parse_while_statement();
     case QTOKEN_REPEAT:
         return parse_repeat_until_statement();
+    case QTOKEN_FOR:
+        return parse_for_statement();
     default:
         fprintf(stderr, "Parser error: unexpected token %s at start of statement\n",
                 token_name(g_current.type));
@@ -1230,7 +1542,7 @@ static ASTNode *parse_relational(void)
 
 static ASTNode *parse_expression(void)
 {
-    return parse_logical_or(); // lowest precedence;
+    return parse_assignment_expression(); // lowest precedence
 }
 
 ASTNode *parse_program(const char *source)

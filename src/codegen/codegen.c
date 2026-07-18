@@ -48,6 +48,20 @@ static VarType infer_type(ASTNode *node)
                 return TYPE_FLOAT;
             return TYPE_INT; // both ints -> int
         }
+
+        if (op == OP_ASSIGN)
+        {
+            return infer_type(node->data.binary.left); // type of left side
+        }
+
+        // compound assignment yields the type of the left operand
+        if (op == OP_ADD_ASSIGN || op == OP_SUB_ASSIGN || op == OP_MUL_ASSIGN ||
+            op == OP_DIV_ASSIGN || op == OP_MOD_ASSIGN || op == OP_POW_ASSIGN ||
+            op == OP_FLDIV_ASSIGN)
+        {
+            return infer_type(node->data.binary.left);
+        }
+
         return TYPE_INT; // fallback
     }
     case AST_UNARY:
@@ -97,6 +111,22 @@ static const char *op_to_cstring(BinaryOp op)
         return "&&";
     case OP_OR:
         return "||";
+    case OP_ASSIGN:
+        return "=";
+    case OP_ADD_ASSIGN:
+        return "+=";
+    case OP_SUB_ASSIGN:
+        return "-=";
+    case OP_MUL_ASSIGN:
+        return "*=";
+    case OP_DIV_ASSIGN:
+        return "/=";
+    case OP_MOD_ASSIGN:
+        return "%=";
+    case OP_POW_ASSIGN:
+        return "**=";
+    case OP_FLDIV_ASSIGN:
+        return "//=";
     default:
         return "???";
     }
@@ -281,6 +311,44 @@ static void emit_statement(ASTNode *node, FILE *out, int indent_level)
         fprintf(out, "while (!(");
         emit_expression(node->data.repeatuntil.condition, out);
         fprintf(out, "));\n");
+        break;
+    }
+
+    case AST_FOR:
+    {
+        fprintf(out, "for (");
+        // init
+        if (node->data.forloop.init)
+        {
+            if (node->data.forloop.init->type == AST_LET)
+            {
+                ASTNode *let_node = node->data.forloop.init;
+                fprintf(out, "%s %s = ", ctype_string(let_node->data.let.vartype), let_node->data.let.name);
+                emit_expression(let_node->data.let.init, out);
+            }
+            else
+            {
+                emit_expression(node->data.forloop.init, out);
+            }
+        }
+        fprintf(out, "; ");
+        // condition
+        if (node->data.forloop.condition)
+        {
+            emit_expression(node->data.forloop.condition, out);
+        }
+        else
+        {
+            fprintf(out, "1");
+        }
+        fprintf(out, "; ");
+        // update
+        if (node->data.forloop.update)
+        {
+            emit_expression(node->data.forloop.update, out);
+        }
+        fprintf(out, ")\n");
+        emit_statement(node->data.forloop.body, out, indent_level);
         break;
     }
 

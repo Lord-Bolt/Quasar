@@ -37,6 +37,8 @@ static QTokenType check_keyword(const char *word)
         return QTOKEN_REPEAT;
     if (strcmp(word, "until") == 0)
         return QTOKEN_UNTIL;
+    if (strcmp(word, "for") == 0)
+        return QTOKEN_FOR;
     return QTOKEN_UNKNOWN; // not a keyword, to indentify err
 }
 

@@ -57,6 +57,7 @@ typedef enum
     QTOKEN_MOD_EQ,   // for %=
     QTOKEN_POW_EQ,   // for **=
     QTOKEN_FLDIV_EQ, // for //=
+    QTOKEN_FOR,
     QTOKEN_UNKNOWN
 } QTokenType;
 

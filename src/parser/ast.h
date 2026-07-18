@@ -20,6 +20,8 @@ typedef enum
     AST_IF,
     AST_WHILE,
     AST_REPEAT_UNTIL,
+    AST_FOR,
+    AST_EXPR_STATEMENT,
 } ASTNodeType;
 
 typedef enum
@@ -38,7 +40,15 @@ typedef enum
     OP_LE,
     OP_GE,
     OP_AND,
-    OP_OR
+    OP_OR,
+    OP_ASSIGN,
+    OP_ADD_ASSIGN,
+    OP_SUB_ASSIGN,
+    OP_MUL_ASSIGN,
+    OP_DIV_ASSIGN,
+    OP_MOD_ASSIGN,
+    OP_POW_ASSIGN,
+    OP_FLDIV_ASSIGN
 } BinaryOp;
 
 typedef enum
@@ -127,6 +137,16 @@ typedef struct ASTNode
             struct ASTNode *condition;
             struct ASTNode *body;
         } repeatuntil; // for AST_REPEAT_UNTIL
+
+        struct
+        {
+            struct ASTNode *init;      // optional (let or assignment statement)
+            struct ASTNode *condition; // optional expression
+            struct ASTNode *update;    // optional expression
+            struct ASTNode *body;      // block
+        } forloop;
+
+        struct ASTNode *expr; // for AST_EXPR_STATEMENT
     } data;
 } ASTNode;
 
@@ -146,6 +166,8 @@ ASTNode *make_unary(UnaryOp op, ASTNode *operand);
 ASTNode *make_if(ASTNode *condition, ASTNode *body, ASTNode *next);
 ASTNode *make_while(ASTNode *condition, ASTNode *body);
 ASTNode *make_repeat_until(ASTNode *condition, ASTNode *body);
+ASTNode *make_for(ASTNode *init, ASTNode *condition, ASTNode *update, ASTNode *body);
+ASTNode *make_expr_statement(ASTNode *expr);
 
 void block_add_statement(ASTNode *block, ASTNode *stmt);       // allows {...} to be used
 void print_add_expression(ASTNode *print_node, ASTNode *expr); // add an expression to the print node

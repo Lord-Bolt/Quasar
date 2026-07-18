@@ -250,6 +250,29 @@ ASTNode *make_repeat_until(ASTNode *condition, ASTNode *body)
     return node;
 }
 
+// for for loop
+ASTNode *make_for(ASTNode *init, ASTNode *condition, ASTNode *update, ASTNode *body)
+{
+    ASTNode *node = (ASTNode *)malloc(sizeof(ASTNode));
+    if (!node)
+        return NULL;
+    node->type = AST_FOR;
+    node->data.forloop.init = init;
+    node->data.forloop.condition = condition;
+    node->data.forloop.update = update;
+    node->data.forloop.body = body;
+    return node;
+}
+ASTNode *make_expr_statement(ASTNode *expr)
+{
+    ASTNode *node = (ASTNode *)malloc(sizeof(ASTNode));
+    if (!node)
+        return NULL;
+    node->type = AST_EXPR_STATEMENT;
+    node->data.expr = expr;
+    return node;
+}
+
 void free_ast(ASTNode *node)
 {
     if (!node)
@@ -308,6 +331,21 @@ void free_ast(ASTNode *node)
     case AST_REPEAT_UNTIL:
         free_ast(node->data.repeatuntil.condition);
         free_ast(node->data.repeatuntil.body);
+        break;
+    case AST_FOR:
+        if (node->data.forloop.init)
+            free_ast(node->data.forloop.init);
+        if (node->data.forloop.condition)
+            free_ast(node->data.forloop.condition);
+        if (node->data.forloop.update)
+            free_ast(node->data.forloop.update);
+        if (node->data.forloop.body)
+            free_ast(node->data.forloop.body);
+        break;
+
+    case AST_EXPR_STATEMENT:
+        if (node->data.expr)
+            free_ast(node->data.expr);
         break;
     default:
         break;
