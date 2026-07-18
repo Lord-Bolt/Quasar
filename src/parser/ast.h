@@ -11,6 +11,7 @@ typedef enum
     AST_CHAR,
     AST_BOOL,
     AST_LET,
+    AST_MULTI_LET,
     AST_VARIABLE,
     AST_ASSIGN,
     AST_PROGRAM,
@@ -164,6 +165,13 @@ typedef struct ASTNode
             int case_count;
             int case_capacity;
         } match;
+
+        struct
+        {
+            struct ASTNode **declarations; // array of AST_LET nodes
+            int count;
+            int capacity;
+        } multilet;
     } data;
 } ASTNode;
 
@@ -188,7 +196,9 @@ ASTNode *make_expr_statement(ASTNode *expr);
 ASTNode *make_break(void);
 ASTNode *make_continue(void);
 ASTNode *make_match(ASTNode *discriminant);
+ASTNode *make_multilet(void);
 
+void multilet_add(ASTNode *multilet, ASTNode *decl);
 void match_add_case(ASTNode *match, ASTNode *value, ASTNode *body);
 void block_add_statement(ASTNode *block, ASTNode *stmt);       // allows {...} to be used
 void print_add_expression(ASTNode *print_node, ASTNode *expr); // add an expression to the print node

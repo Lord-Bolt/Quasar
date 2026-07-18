@@ -134,21 +134,45 @@ static const char *op_to_cstring(BinaryOp op)
 
 static const char *format_spec_for(ASTNode *node)
 {
-    VarType type = infer_type(node);
-    switch (type)
+    if (node->type == AST_VARIABLE)
     {
-    case TYPE_INT:
-        return "%d";
-    case TYPE_FLOAT:
-        return "%g";
-    case TYPE_STRING:
-        return "%s";
-    case TYPE_CHAR:
-        return "%c";
-    case TYPE_BOOL:
-        return "%s"; // bools print as true/false as str
-    default:
-        return "%d"; // fallback
+        // Directly look up the variable's type from the symbol table
+        VarType t = symtab_lookup(node->data.varName);
+        switch (t)
+        {
+        case TYPE_INT:
+            return "%d";
+        case TYPE_FLOAT:
+            return "%g";
+        case TYPE_STRING:
+            return "%s";
+        case TYPE_CHAR:
+            return "%c";
+        case TYPE_BOOL:
+            return "%s"; // true/false as string
+        default:
+            return "%d";
+        }
+    }
+    else
+    {
+        // For literals and other expressions, use infer_type
+        VarType type = infer_type(node);
+        switch (type)
+        {
+        case TYPE_INT:
+            return "%d";
+        case TYPE_FLOAT:
+            return "%g";
+        case TYPE_STRING:
+            return "%s";
+        case TYPE_CHAR:
+            return "%c";
+        case TYPE_BOOL:
+            return "%s";
+        default:
+            return "%d";
+        }
     }
 }
 
@@ -196,7 +220,6 @@ static void emit_expression_maybe_bool(ASTNode *node, FILE *out) // boolean help
     }
 }
 
-// Recursively emit code for a statement (for now only print)
 static void emit_statement(ASTNode *node, FILE *out, int indent_level)
 {
     if (node == NULL)
@@ -207,25 +230,24 @@ static void emit_statement(ASTNode *node, FILE *out, int indent_level)
     case AST_PRINT:
     {
         indent(out, indent_level);
-        // Build format string and argument list
         int n = node->data.print.count;
         if (n == 0)
         {
-            fprintf(out, "printf(\"\\n\");\n"); // just a newline
+            fprintf(out, "printf(\"\\n\");\n");
             break;
         }
 
-        // write the format string with separators (space) between args, then newline
+        // Build dynamic format string using format_spec_for
         fprintf(out, "printf(\"");
         for (int i = 0; i < n; i++)
         {
             fprintf(out, "%s", format_spec_for(node->data.print.expressions[i]));
             if (i < n - 1)
-                fprintf(out, " "); // optional space between arguments
+                fprintf(out, " ");
         }
         fprintf(out, "\\n\"");
 
-        // Now the arguments
+        // Emit arguments, using the bool‑friendly wrapper
         for (int i = 0; i < n; i++)
         {
             fprintf(out, ", ");
@@ -396,6 +418,14 @@ static void emit_statement(ASTNode *node, FILE *out, int indent_level)
         fprintf(out, "}\n");
         break;
     }
+
+    case AST_MULTI_LET:
+        for (int i = 0; i < node->data.multilet.count; i++)
+        {
+            // emit each declaration as a statement (they are AST_LET nodes)
+            emit_statement(node->data.multilet.declarations[i], out, indent_level);
+        }
+        break;
 
     default:
         fprintf(stderr, "Error : unknown statement type %d\n", node->type);

@@ -228,6 +228,7 @@ int main(int argc, char **argv)
 
     printf("Quasar: compiled '%s' -> '%s'\n", source_file, output_file);
     free_ast(ast);
+    symtab_pop_scope();
     free(output_file);
     return 0;
 }

@@ -135,6 +135,38 @@ ASTNode *make_let(const char *name, VarType type, ASTNode *init)
     return node;
 }
 
+ASTNode *make_multilet(void)
+{
+    ASTNode *node = (ASTNode *)malloc(sizeof(ASTNode));
+    if (!node)
+        return NULL;
+    node->type = AST_MULTI_LET;
+    node->data.multilet.capacity = 4;
+    node->data.multilet.count = 0;
+    node->data.multilet.declarations = (struct ASTNode **)malloc(
+        sizeof(struct ASTNode *) * node->data.multilet.capacity);
+    if (!node->data.multilet.declarations)
+    {
+        free(node);
+        return NULL;
+    }
+    return node;
+}
+
+void multilet_add(ASTNode *multilet, ASTNode *decl)
+{
+    if (multilet->data.multilet.count >= multilet->data.multilet.capacity)
+    {
+        multilet->data.multilet.capacity *= 2;
+        multilet->data.multilet.declarations = (struct ASTNode **)realloc(
+            multilet->data.multilet.declarations,
+            sizeof(struct ASTNode *) * multilet->data.multilet.capacity);
+        if (!multilet->data.multilet.declarations)
+            return; // memory error – ignore for now
+    }
+    multilet->data.multilet.declarations[multilet->data.multilet.count++] = decl;
+}
+
 ASTNode *make_variable(const char *name)
 {
     ASTNode *node = malloc(sizeof(ASTNode));
@@ -401,6 +433,7 @@ void free_ast(ASTNode *node)
         if (node->data.expr)
             free_ast(node->data.expr);
         break;
+
     case AST_MATCH:
         free_ast(node->data.match.discriminant);
         for (int i = 0; i < node->data.match.case_count; i++)
@@ -409,6 +442,14 @@ void free_ast(ASTNode *node)
             free_ast(node->data.match.cases[i].body);
         }
         free(node->data.match.cases);
+        break;
+
+    case AST_MULTI_LET:
+        for (int i = 0; i < node->data.multilet.count; i++)
+        {
+            free_ast(node->data.multilet.declarations[i]);
+        }
+        free(node->data.multilet.declarations);
         break;
     default:
         break;

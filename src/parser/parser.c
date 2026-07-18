@@ -24,6 +24,7 @@ static ASTNode *parse_break_statement(void);
 static ASTNode *parse_continue_statement(void);
 static ASTNode *parse_match_statement(void);
 static ASTNode *parse_statement_list_until(const QTokenType terminals[], int n);
+static ASTNode *parse_single_let(void);
 
 static VarType expr_type(ASTNode *node);
 static int parse_errors = 0;
@@ -873,7 +874,7 @@ static ASTNode *parse_block(void)
         return NULL;
     }
 
-    symtab_pop_scope(); // NEW – block ends
+    // symtab_pop_scope(); // NEW – block ends
     return block;
 }
 
@@ -1197,18 +1198,16 @@ static ASTNode *parse_match_statement(void)
     return match_node;
 }
 
-static ASTNode *parse_let_statement(void)
+static ASTNode *parse_single_let(void)
 {
-    advance(); // consume 'let'
-
-    // Expect variable name (identifier)
+    // Expect variable name (no advance – 'let' was already consumed)
     if (g_current.type != QTOKEN_IDENTIFIER)
     {
         fprintf(stderr, "Expected variable name after 'let'\n");
         return NULL;
     }
-    char *name = strdup(g_current.str); // make a copy for the AST
-    advance();                          // consume identifier
+    char *name = strdup(g_current.str);
+    advance(); // consume identifier
 
     if (!expect(QTOKEN_COLON, "expected ':' after variable name"))
     {
@@ -1216,7 +1215,7 @@ static ASTNode *parse_let_statement(void)
         return NULL;
     }
 
-    // Expect a type keyword (int, float, string, char, bool)
+    // Expect a type keyword
     VarType type;
     if (g_current.type == QTOKEN_TYPE_INT || g_current.type == QTOKEN_TYPE_FLOAT ||
         g_current.type == QTOKEN_TYPE_STRING || g_current.type == QTOKEN_TYPE_CHAR ||
@@ -1245,21 +1244,11 @@ static ASTNode *parse_let_statement(void)
         return NULL;
     }
 
-    if (!expect(QTOKEN_SEMICOLON, "expected ';' after let statement"))
-    {
-        free_ast(init);
-        free(name);
-        return NULL;
-    }
-
-    // Register in symbol table
-    symtab_add(name, type);
-
-    // Type check the initializer
-    VarType init_type = expr_type(init);
+    // Type check
+    VarType init_type = expr_type(init); // or infer_type – both exist; use the parser's own
     if (!compatible_assignment(type, init_type))
     {
-        fprintf(stderr, "Error: type mismatch in 'let %s' - expected %s but got %s\n",
+        fprintf(stderr, "Error: type mismatch in 'let %s' – expected %s but got %s\n",
                 name, ctype_string(type), ctype_string(init_type));
         parse_errors++;
         free(name);
@@ -1267,7 +1256,58 @@ static ASTNode *parse_let_statement(void)
         return NULL;
     }
 
+    // Register and return
+    symtab_add(name, type);
     return make_let(name, type, init);
+}
+
+static ASTNode *parse_let_statement(void)
+{
+    advance(); // consume 'let'
+
+    // Parse the first declaration
+    ASTNode *first = parse_single_let();
+    if (!first)
+        return NULL;
+
+    // If there's no comma, it's a simple single declaration
+    if (g_current.type != QTOKEN_COMMA)
+    {
+        if (!expect(QTOKEN_SEMICOLON, "expected ';' after let statement"))
+        {
+            free_ast(first);
+            return NULL;
+        }
+        return first; // returns a single AST_LET
+    }
+
+    // Otherwise, build an AST_MULTI_LET
+    ASTNode *multilet = make_multilet();
+    if (!multilet)
+    {
+        free_ast(first);
+        return NULL;
+    }
+    multilet_add(multilet, first);
+
+    while (g_current.type == QTOKEN_COMMA)
+    {
+        advance(); // consume ','
+        ASTNode *decl = parse_single_let();
+        if (!decl)
+        {
+            free_ast(multilet);
+            return NULL;
+        }
+        multilet_add(multilet, decl);
+    }
+
+    if (!expect(QTOKEN_SEMICOLON, "expected ';' after let statement"))
+    {
+        free_ast(multilet);
+        return NULL;
+    }
+    return multilet;
 }
 
 // Parses "let name : type = expression" without consuming the trailing semicolon.
@@ -1754,6 +1794,5 @@ ASTNode *parse_program(const char *source)
             }
         }
     }
-    symtab_pop_scope(); // close global scope
     return program;
 }
