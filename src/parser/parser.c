@@ -20,6 +20,8 @@ static ASTNode *parse_while_statement(void);
 static ASTNode *parse_repeat_until_statement(void);
 static ASTNode *parse_postfix(void);
 static ASTNode *parse_for_statement(void);
+static ASTNode *parse_break_statement(void);
+static ASTNode *parse_continue_statement(void);
 
 static VarType expr_type(ASTNode *node);
 static int parse_errors = 0;
@@ -339,6 +341,10 @@ const char *token_name(QTokenType type)
         return "'//='";
     case QTOKEN_FOR:
         return "'for'";
+    case QTOKEN_BREAK:
+        return "'break'";
+    case QTOKEN_CONTINUE:
+        return "'continue'";
     default:
         return "???";
     }
@@ -447,6 +453,22 @@ static bool check_assignment_op(BinaryOp op, ASTNode *left, ASTNode *right)
 }
 
 // ---Recursive Descent Fuctions---
+static ASTNode *parse_break_statement(void)
+{
+    advance(); // consume 'break'
+    if (!expect(QTOKEN_SEMICOLON, "expected ';' after 'break'"))
+        return NULL;
+    return make_break();
+}
+
+static ASTNode *parse_continue_statement(void)
+{
+    advance(); // consume 'continue'
+    if (!expect(QTOKEN_SEMICOLON, "expected ';' after 'continue'"))
+        return NULL;
+    return make_continue();
+}
+
 static ASTNode *parse_postfix(void)
 {
     ASTNode *node = parse_primary(); // get the operand (identifier, literal, etc.)
@@ -1408,6 +1430,10 @@ static ASTNode *parse_statement(void)
         return parse_repeat_until_statement();
     case QTOKEN_FOR:
         return parse_for_statement();
+    case QTOKEN_BREAK:
+        return parse_break_statement();
+    case QTOKEN_CONTINUE:
+        return parse_continue_statement();
     default:
         fprintf(stderr, "Parser error: unexpected token %s at start of statement\n",
                 token_name(g_current.type));

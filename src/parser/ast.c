@@ -273,6 +273,26 @@ ASTNode *make_expr_statement(ASTNode *expr)
     return node;
 }
 
+// for break and continue
+// for break and continue
+ASTNode *make_break(void)
+{
+    ASTNode *node = (ASTNode *)malloc(sizeof(ASTNode));
+    if (!node)
+        return NULL;
+    node->type = AST_BREAK;
+    return node;
+}
+
+ASTNode *make_continue(void)
+{
+    ASTNode *node = (ASTNode *)malloc(sizeof(ASTNode));
+    if (!node)
+        return NULL;
+    node->type = AST_CONTINUE;
+    return node;
+}
+
 void free_ast(ASTNode *node)
 {
     if (!node)

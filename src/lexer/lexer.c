@@ -39,7 +39,11 @@ static QTokenType check_keyword(const char *word)
         return QTOKEN_UNTIL;
     if (strcmp(word, "for") == 0)
         return QTOKEN_FOR;
-    return QTOKEN_UNKNOWN; // not a keyword, to indentify err
+    if (strcmp(word, "break") == 0)
+        return QTOKEN_BREAK;
+    if (strcmp(word, "continue") == 0)
+        return QTOKEN_CONTINUE;
+    return QTOKEN_UNKNOWN; // not a keyword, to identify err
 }
 
 static char *read_string(const char *src, int *pos)

@@ -352,6 +352,16 @@ static void emit_statement(ASTNode *node, FILE *out, int indent_level)
         break;
     }
 
+    case AST_BREAK:
+        indent(out, indent_level);
+        fprintf(out, "break;\n");
+        break;
+
+    case AST_CONTINUE:
+        indent(out, indent_level);
+        fprintf(out, "continue;\n");
+        break;
+
     default:
         fprintf(stderr, "Error : unknown statement type %d\n", node->type);
         exit(1);

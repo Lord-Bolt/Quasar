@@ -22,6 +22,8 @@ typedef enum
     AST_REPEAT_UNTIL,
     AST_FOR,
     AST_EXPR_STATEMENT,
+    AST_BREAK,
+    AST_CONTINUE,
 } ASTNodeType;
 
 typedef enum
@@ -168,6 +170,8 @@ ASTNode *make_while(ASTNode *condition, ASTNode *body);
 ASTNode *make_repeat_until(ASTNode *condition, ASTNode *body);
 ASTNode *make_for(ASTNode *init, ASTNode *condition, ASTNode *update, ASTNode *body);
 ASTNode *make_expr_statement(ASTNode *expr);
+ASTNode *make_break(void);
+ASTNode *make_continue(void);
 
 void block_add_statement(ASTNode *block, ASTNode *stmt);       // allows {...} to be used
 void print_add_expression(ASTNode *print_node, ASTNode *expr); // add an expression to the print node
