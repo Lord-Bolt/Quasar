@@ -60,6 +60,9 @@ typedef enum
     QTOKEN_FOR,
     QTOKEN_BREAK,
     QTOKEN_CONTINUE,
+    QTOKEN_MATCH,
+    QTOKEN_CASE,
+    QTOKEN_DEFAULT,
     QTOKEN_UNKNOWN
 } QTokenType;
 

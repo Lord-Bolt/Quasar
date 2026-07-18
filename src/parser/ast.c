@@ -274,7 +274,6 @@ ASTNode *make_expr_statement(ASTNode *expr)
 }
 
 // for break and continue
-// for break and continue
 ASTNode *make_break(void)
 {
     ASTNode *node = (ASTNode *)malloc(sizeof(ASTNode));
@@ -291,6 +290,41 @@ ASTNode *make_continue(void)
         return NULL;
     node->type = AST_CONTINUE;
     return node;
+}
+
+// for match...case...default
+ASTNode *make_match(ASTNode *discriminant)
+{
+    ASTNode *node = (ASTNode *)malloc(sizeof(ASTNode));
+    if (!node)
+        return NULL;
+    node->type = AST_MATCH;
+    node->data.match.discriminant = discriminant;
+    node->data.match.case_capacity = 4;
+    node->data.match.cases = (MatchCase *)malloc(sizeof(MatchCase) * node->data.match.case_capacity);
+    if (!node->data.match.cases)
+    {
+        free(node);
+        return NULL;
+    }
+    node->data.match.case_count = 0;
+    return node;
+}
+
+void match_add_case(ASTNode *match, ASTNode *value, ASTNode *body)
+{
+    if (match->data.match.case_count >= match->data.match.case_capacity)
+    {
+        match->data.match.case_capacity *= 2;
+        match->data.match.cases = (MatchCase *)realloc(
+            match->data.match.cases,
+            sizeof(MatchCase) * match->data.match.case_capacity);
+        if (!match->data.match.cases)
+            return; // memory error – ignore for now
+    }
+    match->data.match.cases[match->data.match.case_count].value = value;
+    match->data.match.cases[match->data.match.case_count].body = body;
+    match->data.match.case_count++;
 }
 
 void free_ast(ASTNode *node)
@@ -366,6 +400,15 @@ void free_ast(ASTNode *node)
     case AST_EXPR_STATEMENT:
         if (node->data.expr)
             free_ast(node->data.expr);
+        break;
+    case AST_MATCH:
+        free_ast(node->data.match.discriminant);
+        for (int i = 0; i < node->data.match.case_count; i++)
+        {
+            free_ast(node->data.match.cases[i].value); // could be NULL
+            free_ast(node->data.match.cases[i].body);
+        }
+        free(node->data.match.cases);
         break;
     default:
         break;

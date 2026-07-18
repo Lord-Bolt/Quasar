@@ -24,6 +24,7 @@ typedef enum
     AST_EXPR_STATEMENT,
     AST_BREAK,
     AST_CONTINUE,
+    AST_MATCH,
 } ASTNodeType;
 
 typedef enum
@@ -63,6 +64,12 @@ typedef enum
     UNARY_POST_INC, // x++
     UNARY_POST_DEC  // x--
 } UnaryOp;
+
+typedef struct
+{
+    struct ASTNode *value; // NULL for default
+    struct ASTNode *body;  // block of statements
+} MatchCase;
 
 typedef struct ASTNode
 {
@@ -149,6 +156,14 @@ typedef struct ASTNode
         } forloop;
 
         struct ASTNode *expr; // for AST_EXPR_STATEMENT
+
+        struct
+        {
+            struct ASTNode *discriminant; // <-- was ASTNode *, now struct ASTNode *
+            MatchCase *cases;
+            int case_count;
+            int case_capacity;
+        } match;
     } data;
 } ASTNode;
 
@@ -172,7 +187,9 @@ ASTNode *make_for(ASTNode *init, ASTNode *condition, ASTNode *update, ASTNode *b
 ASTNode *make_expr_statement(ASTNode *expr);
 ASTNode *make_break(void);
 ASTNode *make_continue(void);
+ASTNode *make_match(ASTNode *discriminant);
 
+void match_add_case(ASTNode *match, ASTNode *value, ASTNode *body);
 void block_add_statement(ASTNode *block, ASTNode *stmt);       // allows {...} to be used
 void print_add_expression(ASTNode *print_node, ASTNode *expr); // add an expression to the print node
 void program_add_statement(ASTNode *program, ASTNode *stmt);   // adds a child to the program

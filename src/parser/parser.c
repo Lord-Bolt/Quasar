@@ -22,6 +22,8 @@ static ASTNode *parse_postfix(void);
 static ASTNode *parse_for_statement(void);
 static ASTNode *parse_break_statement(void);
 static ASTNode *parse_continue_statement(void);
+static ASTNode *parse_match_statement(void);
+static ASTNode *parse_statement_list_until(const QTokenType terminals[], int n);
 
 static VarType expr_type(ASTNode *node);
 static int parse_errors = 0;
@@ -453,6 +455,42 @@ static bool check_assignment_op(BinaryOp op, ASTNode *left, ASTNode *right)
 }
 
 // ---Recursive Descent Fuctions---
+
+// Parse statements until one of the tokens in 'terminals' (size 'n') is seen.
+// The terminal token is NOT consumed.
+// Returns an AST_BLOCK containing the parsed statements, or NULL on error.
+static ASTNode *parse_statement_list_until(const QTokenType terminals[], int n)
+{
+    ASTNode *block = make_block();
+    if (!block)
+        return NULL;
+
+    while (1)
+    {
+        // check if current token is one of the terminal tokens
+        bool stop = false;
+        for (int i = 0; i < n; i++)
+        {
+            if (g_current.type == terminals[i])
+            {
+                stop = true;
+                break;
+            }
+        }
+        if (stop)
+            break;
+
+        ASTNode *stmt = parse_statement();
+        if (!stmt)
+        {
+            // error recovery? for now free block and return NULL
+            free_ast(block);
+            return NULL;
+        }
+        block_add_statement(block, stmt);
+    }
+    return block;
+}
 static ASTNode *parse_break_statement(void)
 {
     advance(); // consume 'break'
@@ -1052,6 +1090,113 @@ static ASTNode *parse_assignment_expression(void)
     return left;
 }
 
+static ASTNode *parse_match_statement(void)
+{
+    advance(); // consume 'match'
+
+    if (!expect(QTOKEN_LPAREN, "expected '(' after 'match'"))
+        return NULL;
+
+    ASTNode *discriminant = parse_expression();
+    if (!discriminant)
+        return NULL;
+
+    if (!expect(QTOKEN_RPAREN, "expected ')' after match expression"))
+    {
+        free_ast(discriminant);
+        return NULL;
+    }
+
+    if (!expect(QTOKEN_LBRACE, "expected '{' to start match body"))
+    {
+        free_ast(discriminant);
+        return NULL;
+    }
+
+    ASTNode *match_node = make_match(discriminant);
+    if (!match_node)
+    {
+        free_ast(discriminant);
+        return NULL;
+    }
+
+    // The tokens that end a case body: case, default, or }
+    const QTokenType end_tokens[] = {QTOKEN_CASE, QTOKEN_DEFAULT, QTOKEN_RBRACE};
+
+    while (g_current.type != QTOKEN_RBRACE && g_current.type != QTOKEN_EOF)
+    {
+        if (g_current.type == QTOKEN_CASE)
+        {
+            advance(); // consume 'case'
+
+            // Parse case value – only integer or char literal for now
+            ASTNode *case_value = NULL;
+            if (g_current.type == QTOKEN_INTEGER || g_current.type == QTOKEN_CHAR ||
+                g_current.type == QTOKEN_TRUE || g_current.type == QTOKEN_FALSE)
+            {
+                case_value = parse_expression(); // should parse the literal
+            }
+            else
+            {
+                fprintf(stderr, "Error: case value must be an integer, char, or boolean literal\n");
+                parse_errors++;
+                free_ast(match_node);
+                return NULL;
+            }
+
+            if (!expect(QTOKEN_COLON, "expected ':' after case value"))
+            {
+                free_ast(match_node);
+                return NULL;
+            }
+
+            // Parse the case body (statements until next case/default/})
+            ASTNode *body = parse_statement_list_until(end_tokens, 3);
+            if (!body)
+            {
+                free_ast(match_node);
+                return NULL;
+            }
+
+            match_add_case(match_node, case_value, body);
+        }
+        else if (g_current.type == QTOKEN_DEFAULT)
+        {
+            advance(); // consume 'default'
+
+            if (!expect(QTOKEN_COLON, "expected ':' after 'default'"))
+            {
+                free_ast(match_node);
+                return NULL;
+            }
+
+            ASTNode *body = parse_statement_list_until(end_tokens, 3);
+            if (!body)
+            {
+                free_ast(match_node);
+                return NULL;
+            }
+
+            match_add_case(match_node, NULL, body); // NULL means default
+        }
+        else
+        {
+            fprintf(stderr, "Error: expected 'case' or 'default' in match body\n");
+            parse_errors++;
+            free_ast(match_node);
+            return NULL;
+        }
+    }
+
+    if (!expect(QTOKEN_RBRACE, "expected '}' to close match body"))
+    {
+        free_ast(match_node);
+        return NULL;
+    }
+
+    return match_node;
+}
+
 static ASTNode *parse_let_statement(void)
 {
     advance(); // consume 'let'
@@ -1434,6 +1579,8 @@ static ASTNode *parse_statement(void)
         return parse_break_statement();
     case QTOKEN_CONTINUE:
         return parse_continue_statement();
+    case QTOKEN_MATCH:
+        return parse_match_statement();
     default:
         fprintf(stderr, "Parser error: unexpected token %s at start of statement\n",
                 token_name(g_current.type));

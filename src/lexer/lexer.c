@@ -43,6 +43,12 @@ static QTokenType check_keyword(const char *word)
         return QTOKEN_BREAK;
     if (strcmp(word, "continue") == 0)
         return QTOKEN_CONTINUE;
+    if (strcmp(word, "match") == 0)
+        return QTOKEN_MATCH;
+    if (strcmp(word, "case") == 0)
+        return QTOKEN_CASE;
+    if (strcmp(word, "default") == 0)
+        return QTOKEN_DEFAULT;
     return QTOKEN_UNKNOWN; // not a keyword, to identify err
 }
 

@@ -362,6 +362,41 @@ static void emit_statement(ASTNode *node, FILE *out, int indent_level)
         fprintf(out, "continue;\n");
         break;
 
+    case AST_MATCH:
+    {
+        indent(out, indent_level);
+        fprintf(out, "switch (");
+        emit_expression(node->data.match.discriminant, out);
+        fprintf(out, ") {\n");
+
+        for (int i = 0; i < node->data.match.case_count; i++)
+        {
+            ASTNode *value = node->data.match.cases[i].value;
+            ASTNode *body = node->data.match.cases[i].body;
+
+            if (value)
+            {
+                indent(out, indent_level);
+                fprintf(out, "case ");
+                // emit the value (should be a literal)
+                emit_expression(value, out);
+                fprintf(out, ":\n");
+            }
+            else
+            {
+                indent(out, indent_level);
+                fprintf(out, "default:\n");
+            }
+            // emit the body statements with increased indent
+            // body is an AST_BLOCK, which contains the statements; we can just call emit_statement on the block, which will handle the indentation.
+            emit_statement(body, out, indent_level + 1);
+        }
+
+        indent(out, indent_level);
+        fprintf(out, "}\n");
+        break;
+    }
+
     default:
         fprintf(stderr, "Error : unknown statement type %d\n", node->type);
         exit(1);
