@@ -27,6 +27,7 @@ typedef enum
     AST_CONTINUE,
     AST_MATCH,
     AST_INPUT,
+    AST_TYPE_CONV,
 } ASTNodeType;
 
 typedef enum
@@ -175,6 +176,12 @@ typedef struct ASTNode
         } multilet;
 
         struct ASTNode *prompt; // optional prompt expression (NULL if none)
+
+        struct
+        {
+            VarType target;         // the type we want
+            struct ASTNode *source; // the source expression
+        } typeconv;
     } data;
 } ASTNode;
 
@@ -201,6 +208,7 @@ ASTNode *make_continue(void);
 ASTNode *make_match(ASTNode *discriminant);
 ASTNode *make_multilet(void);
 ASTNode *make_input(ASTNode *prompt);
+ASTNode *make_type_conv(VarType target, ASTNode *source);
 
 void multilet_add(ASTNode *multilet, ASTNode *decl);
 void match_add_case(ASTNode *match, ASTNode *value, ASTNode *body);

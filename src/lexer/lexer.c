@@ -51,6 +51,16 @@ static QTokenType check_keyword(const char *word)
         return QTOKEN_DEFAULT;
     if (strcmp(word, "input") == 0)
         return QTOKEN_INPUT;
+    if (strcmp(word, "to_int") == 0)
+        return QTOKEN_TO_INT;
+    if (strcmp(word, "to_float") == 0)
+        return QTOKEN_TO_FLOAT;
+    if (strcmp(word, "to_string") == 0)
+        return QTOKEN_TO_STRING;
+    if (strcmp(word, "to_char") == 0)
+        return QTOKEN_TO_CHAR;
+    if (strcmp(word, "to_bool") == 0)
+        return QTOKEN_TO_BOOL;
     return QTOKEN_UNKNOWN; // not a keyword, to identify err
 }
 

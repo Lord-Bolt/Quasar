@@ -244,6 +244,8 @@ static VarType expr_type(ASTNode *node)
         return symtab_lookup(node->data.varName);
     case AST_INPUT:
         return TYPE_STRING;
+    case AST_TYPE_CONV:
+        return node->data.typeconv.target;
     default:
         return TYPE_INT;
     }
@@ -352,6 +354,16 @@ const char *token_name(QTokenType type)
         return "'continue'";
     case QTOKEN_INPUT:
         return "'input'";
+    case QTOKEN_TO_INT:
+        return "'to_int'";
+    case QTOKEN_TO_FLOAT:
+        return "'to_float'";
+    case QTOKEN_TO_STRING:
+        return "'to_string'";
+    case QTOKEN_TO_CHAR:
+        return "'to_char'";
+    case QTOKEN_TO_BOOL:
+        return "'to_bool'";
     default:
         return "???";
     }
@@ -965,6 +977,75 @@ static ASTNode *parse_primary(void)
             return NULL;
 
         return make_input(prompt);
+    }
+    // Type conversion built‑ins
+    if (g_current.type == QTOKEN_TO_INT || g_current.type == QTOKEN_TO_FLOAT ||
+        g_current.type == QTOKEN_TO_STRING || g_current.type == QTOKEN_TO_CHAR ||
+        g_current.type == QTOKEN_TO_BOOL)
+    {
+        VarType target;
+        switch (g_current.type)
+        {
+        case QTOKEN_TO_INT:
+            target = TYPE_INT;
+            break;
+        case QTOKEN_TO_FLOAT:
+            target = TYPE_FLOAT;
+            break;
+        case QTOKEN_TO_STRING:
+            target = TYPE_STRING;
+            break;
+        case QTOKEN_TO_CHAR:
+            target = TYPE_CHAR;
+            break;
+        case QTOKEN_TO_BOOL:
+            target = TYPE_BOOL;
+            break;
+        default:
+            return NULL; // unreachable
+        }
+        advance(); // consume the conversion keyword
+
+        if (!expect(QTOKEN_LPAREN, "expected '(' after conversion function"))
+            return NULL;
+
+        ASTNode *arg = parse_expression();
+        if (!arg)
+            return NULL;
+
+        if (!expect(QTOKEN_RPAREN, "expected ')' after conversion argument"))
+            return NULL;
+
+        // Type‑check the argument (loose for now – we'll let C handle errors)
+        // But we can give warnings for known bad conversions
+        VarType arg_type = expr_type(arg);
+        switch (target)
+        {
+        case TYPE_INT:
+        case TYPE_FLOAT:
+            if (arg_type != TYPE_STRING && arg_type != TYPE_INT && arg_type != TYPE_FLOAT)
+            {
+                fprintf(stderr, "Warning: to_int/to_float expects a string or number\n");
+            }
+            break;
+        case TYPE_STRING:
+            // any type can be converted to string – fine
+            break;
+        case TYPE_CHAR:
+            if (arg_type != TYPE_STRING && arg_type != TYPE_INT)
+            {
+                fprintf(stderr, "Warning: to_char expects a string or integer\n");
+            }
+            break;
+        case TYPE_BOOL:
+            if (arg_type != TYPE_STRING && arg_type != TYPE_BOOL && arg_type != TYPE_INT && arg_type != TYPE_FLOAT)
+            {
+                fprintf(stderr, "Warning: to_bool expects a string, bool, or number\n");
+            }
+            break;
+        }
+
+        return make_type_conv(target, arg);
     }
     if (g_current.type == QTOKEN_IDENTIFIER)
     {

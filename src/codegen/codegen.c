@@ -75,6 +75,9 @@ static VarType infer_type(ASTNode *node)
     case AST_INPUT:
         return TYPE_STRING;
 
+    case AST_TYPE_CONV:
+        return node->data.typeconv.target;
+
     default:
         return TYPE_INT; // <- caused mental damage
     }
@@ -194,26 +197,39 @@ void generate_code(ASTNode *program, FILE *out)
         fprintf(stderr, "Error: root node must be AST_PROGRAM\n");
         exit(1);
     }
+
+    /* Standard headers */
     fprintf(out, "#include <stdio.h>\n");
     fprintf(out, "#include <string.h>\n");
     fprintf(out, "#include <stdbool.h>\n");
     fprintf(out, "#include <stdlib.h>\n");
     fprintf(out, "#include <math.h>\n\n");
 
-    fprintf(out, "int main(void) {\n");
-    fprintf(out, "\n/* Quasar runtime helpers */\n");
+    /* ========== Quasar runtime helpers (global scope) ========== */
+    fprintf(out, "/* Quasar runtime helpers */\n");
+
     fprintf(out, "char *quasar_input(const char *prompt) {\n");
-    fprintf(out, "\tif (prompt) printf(\"%%s\", prompt);\n");
-    fprintf(out, "\tchar buffer[1024];\n");
-    fprintf(out, "\tif (fgets(buffer, sizeof(buffer), stdin)) {\n");
-    fprintf(out, "\t\tsize_t len = strlen(buffer);\n");
-    fprintf(out, "\t\tif (len > 0 && buffer[len-1] == '\\n') buffer[len-1] = '\\0';\n");
-    fprintf(out, "\t\treturn strdup(buffer);\n");
-    fprintf(out, "\t}\n");
-    fprintf(out, "\treturn strdup(\"\");\n");
+    fprintf(out, "    if (prompt) printf(\"%%s\", prompt);\n");
+    fprintf(out, "    char buffer[1024];\n");
+    fprintf(out, "    if (fgets(buffer, sizeof(buffer), stdin)) {\n");
+    fprintf(out, "        size_t len = strlen(buffer);\n");
+    fprintf(out, "        if (len > 0 && buffer[len-1] == '\\n') buffer[len-1] = '\\0';\n");
+    fprintf(out, "        return strdup(buffer);\n");
+    fprintf(out, "    }\n");
+    fprintf(out, "    return strdup(\"\");\n");
     fprintf(out, "}\n\n");
 
-    // Just emit all statements in order – let blocks handle nesting
+    fprintf(out, "char *quasar_to_string(double x) {\n");
+    fprintf(out, "    char buffer[128];\n");
+    fprintf(out, "    snprintf(buffer, sizeof(buffer), \"%%g\", x);\n");
+    fprintf(out, "    return strdup(buffer);\n");
+    fprintf(out, "}\n\n");
+    /* ======================================================== */
+
+    /* Main function */
+    fprintf(out, "int main(void) {\n");
+
+    // Emit all statements (no more helpers here!)
     for (int i = 0; i < program->data.program.count; i++)
     {
         emit_statement(program->data.program.statements[i], out, 1);
@@ -638,6 +654,76 @@ static void emit_expression(ASTNode *node, FILE *out)
             fprintf(out, "quasar_input(NULL)");
         }
         break;
+    case AST_TYPE_CONV:
+    {
+        VarType target = node->data.typeconv.target;
+        ASTNode *arg = node->data.typeconv.source;
+
+        switch (target)
+        {
+        case TYPE_INT:
+            fprintf(out, "atoi(");
+            emit_expression(arg, out);
+            fprintf(out, ")");
+            break;
+        case TYPE_FLOAT:
+            fprintf(out, "atof(");
+            emit_expression(arg, out);
+            fprintf(out, ")");
+            break;
+        case TYPE_STRING:
+            // If arg is already string, just emit it; else use helper
+            if (infer_type(arg) == TYPE_STRING)
+            {
+                emit_expression(arg, out);
+            }
+            else
+            {
+                fprintf(out, "quasar_to_string(");
+                emit_expression(arg, out);
+                fprintf(out, ")");
+            }
+            break;
+        case TYPE_CHAR:
+            // If arg is int, just use (char); if string, take first char
+            if (infer_type(arg) == TYPE_INT)
+            {
+                fprintf(out, "(char)(");
+                emit_expression(arg, out);
+                fprintf(out, ")");
+            }
+            else
+            {
+                // string: take first char, else '\\0'
+                fprintf(out, "(");
+                emit_expression(arg, out);
+                fprintf(out, ")[0]");
+            }
+            break;
+        case TYPE_BOOL:
+            // If arg is string, compare to "true"? Simpler: emit (strcmp(arg, "true")==0 || atoi(arg)!=0)
+            if (infer_type(arg) == TYPE_STRING)
+            {
+                fprintf(out, "((strcmp(");
+                emit_expression(arg, out);
+                fprintf(out, ", \"true\") == 0) || (atoi(");
+                emit_expression(arg, out);
+                fprintf(out, ") != 0))");
+            }
+            else if (infer_type(arg) == TYPE_BOOL)
+            {
+                emit_expression(arg, out);
+            }
+            else
+            {
+                fprintf(out, "(");
+                emit_expression(arg, out);
+                fprintf(out, " != 0)");
+            }
+            break;
+        }
+        break;
+    }
     default:
         break;
     }

@@ -370,6 +370,18 @@ ASTNode *make_input(ASTNode *prompt)
     return node;
 }
 
+// for type conversions
+ASTNode *make_type_conv(VarType target, ASTNode *source)
+{
+    ASTNode *node = (ASTNode *)malloc(sizeof(ASTNode));
+    if (!node)
+        return NULL;
+    node->type = AST_TYPE_CONV;
+    node->data.typeconv.target = target;
+    node->data.typeconv.source = source;
+    return node;
+}
+
 void free_ast(ASTNode *node)
 {
     if (!node)
@@ -464,6 +476,9 @@ void free_ast(ASTNode *node)
         break;
     case AST_INPUT:
         free_ast(node->data.prompt);
+        break;
+    case AST_TYPE_CONV:
+        free_ast(node->data.typeconv.source);
         break;
     default:
         break;

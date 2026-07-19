@@ -64,6 +64,11 @@ typedef enum
     QTOKEN_CASE,
     QTOKEN_DEFAULT,
     QTOKEN_INPUT,
+    QTOKEN_TO_INT,    // for to_int
+    QTOKEN_TO_FLOAT,  // for to_float
+    QTOKEN_TO_STRING, // for to_string
+    QTOKEN_TO_CHAR,   // for to_char
+    QTOKEN_TO_BOOL,   // for to_bool
     QTOKEN_UNKNOWN
 } QTokenType;
 
