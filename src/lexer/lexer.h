@@ -63,6 +63,7 @@ typedef enum
     QTOKEN_MATCH,
     QTOKEN_CASE,
     QTOKEN_DEFAULT,
+    QTOKEN_INPUT,
     QTOKEN_UNKNOWN
 } QTokenType;
 

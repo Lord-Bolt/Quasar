@@ -72,6 +72,9 @@ static VarType infer_type(ASTNode *node)
             return infer_type(node->data.unary.operand);
         return TYPE_INT;
 
+    case AST_INPUT:
+        return TYPE_STRING;
+
     default:
         return TYPE_INT; // <- caused mental damage
     }
@@ -192,9 +195,23 @@ void generate_code(ASTNode *program, FILE *out)
         exit(1);
     }
     fprintf(out, "#include <stdio.h>\n");
+    fprintf(out, "#include <string.h>\n");
     fprintf(out, "#include <stdbool.h>\n");
+    fprintf(out, "#include <stdlib.h>\n");
     fprintf(out, "#include <math.h>\n\n");
+
     fprintf(out, "int main(void) {\n");
+    fprintf(out, "\n/* Quasar runtime helpers */\n");
+    fprintf(out, "char *quasar_input(const char *prompt) {\n");
+    fprintf(out, "\tif (prompt) printf(\"%%s\", prompt);\n");
+    fprintf(out, "\tchar buffer[1024];\n");
+    fprintf(out, "\tif (fgets(buffer, sizeof(buffer), stdin)) {\n");
+    fprintf(out, "\t\tsize_t len = strlen(buffer);\n");
+    fprintf(out, "\t\tif (len > 0 && buffer[len-1] == '\\n') buffer[len-1] = '\\0';\n");
+    fprintf(out, "\t\treturn strdup(buffer);\n");
+    fprintf(out, "\t}\n");
+    fprintf(out, "\treturn strdup(\"\");\n");
+    fprintf(out, "}\n\n");
 
     // Just emit all statements in order – let blocks handle nesting
     for (int i = 0; i < program->data.program.count; i++)
@@ -420,11 +437,19 @@ static void emit_statement(ASTNode *node, FILE *out, int indent_level)
     }
 
     case AST_MULTI_LET:
+    {
         for (int i = 0; i < node->data.multilet.count; i++)
         {
             // emit each declaration as a statement (they are AST_LET nodes)
             emit_statement(node->data.multilet.declarations[i], out, indent_level);
         }
+        break;
+    }
+
+    case AST_EXPR_STATEMENT:
+        indent(out, indent_level);
+        emit_expression(node->data.expr, out);
+        fprintf(out, ";\n");
         break;
 
     default:
@@ -599,6 +624,18 @@ static void emit_expression(ASTNode *node, FILE *out)
             fprintf(out, "(");
             emit_expression(node->data.unary.operand, out);
             fprintf(out, ")--");
+        }
+        break;
+    case AST_INPUT:
+        if (node->data.prompt)
+        {
+            fprintf(out, "quasar_input(");
+            emit_expression(node->data.prompt, out);
+            fprintf(out, ")");
+        }
+        else
+        {
+            fprintf(out, "quasar_input(NULL)");
         }
         break;
     default:

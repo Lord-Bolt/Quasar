@@ -26,6 +26,7 @@ typedef enum
     AST_BREAK,
     AST_CONTINUE,
     AST_MATCH,
+    AST_INPUT,
 } ASTNodeType;
 
 typedef enum
@@ -172,6 +173,8 @@ typedef struct ASTNode
             int count;
             int capacity;
         } multilet;
+
+        struct ASTNode *prompt; // optional prompt expression (NULL if none)
     } data;
 } ASTNode;
 
@@ -197,6 +200,7 @@ ASTNode *make_break(void);
 ASTNode *make_continue(void);
 ASTNode *make_match(ASTNode *discriminant);
 ASTNode *make_multilet(void);
+ASTNode *make_input(ASTNode *prompt);
 
 void multilet_add(ASTNode *multilet, ASTNode *decl);
 void match_add_case(ASTNode *match, ASTNode *value, ASTNode *body);

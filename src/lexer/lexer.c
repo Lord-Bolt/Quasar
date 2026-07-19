@@ -49,6 +49,8 @@ static QTokenType check_keyword(const char *word)
         return QTOKEN_CASE;
     if (strcmp(word, "default") == 0)
         return QTOKEN_DEFAULT;
+    if (strcmp(word, "input") == 0)
+        return QTOKEN_INPUT;
     return QTOKEN_UNKNOWN; // not a keyword, to identify err
 }
 

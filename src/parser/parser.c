@@ -242,6 +242,8 @@ static VarType expr_type(ASTNode *node)
         return TYPE_BOOL;
     case AST_VARIABLE:
         return symtab_lookup(node->data.varName);
+    case AST_INPUT:
+        return TYPE_STRING;
     default:
         return TYPE_INT;
     }
@@ -348,9 +350,22 @@ const char *token_name(QTokenType type)
         return "'break'";
     case QTOKEN_CONTINUE:
         return "'continue'";
+    case QTOKEN_INPUT:
+        return "'input'";
     default:
         return "???";
     }
+}
+
+static bool is_expression_start(QTokenType type)
+{
+    return type == QTOKEN_IDENTIFIER || type == QTOKEN_INTEGER ||
+           type == QTOKEN_FLOAT || type == QTOKEN_STRING ||
+           type == QTOKEN_CHAR || type == QTOKEN_TRUE ||
+           type == QTOKEN_FALSE || type == QTOKEN_NOT ||
+           type == QTOKEN_MINUS || type == QTOKEN_PLUS ||
+           type == QTOKEN_INC || type == QTOKEN_DEC ||
+           type == QTOKEN_INPUT;
 }
 
 // --- Lexer interface ---
@@ -920,6 +935,36 @@ static ASTNode *parse_primary(void)
     {
         advance();
         return make_bool(0);
+    }
+    if (g_current.type == QTOKEN_INPUT)
+    {
+        advance(); // consume 'input'
+        if (!expect(QTOKEN_LPAREN, "expected '(' after 'input'"))
+            return NULL;
+
+        ASTNode *prompt = NULL;
+        if (g_current.type != QTOKEN_RPAREN)
+        {
+            prompt = parse_expression();
+            if (!prompt)
+                return NULL;
+
+            // Type check: prompt must be a string
+            VarType pt = expr_type(prompt);
+            if (pt != TYPE_STRING)
+            {
+                fprintf(stderr, "Error: input prompt must be a string, got %s\n",
+                        ctype_string(pt));
+                parse_errors++;
+                free_ast(prompt);
+                return NULL;
+            }
+        }
+
+        if (!expect(QTOKEN_RPAREN, "expected ')' after input"))
+            return NULL;
+
+        return make_input(prompt);
     }
     if (g_current.type == QTOKEN_IDENTIFIER)
     {
@@ -1507,31 +1552,31 @@ static ASTNode *parse_statement(void)
         switch (g_current.type)
         {
         case QTOKEN_PLUS_EQ:
-            compound_op = OP_ADD;
+            compound_op = OP_ADD_ASSIGN;
             is_compound = true;
             break;
         case QTOKEN_MINUS_EQ:
-            compound_op = OP_SUB;
+            compound_op = OP_SUB_ASSIGN;
             is_compound = true;
             break;
         case QTOKEN_STAR_EQ:
-            compound_op = OP_MUL;
+            compound_op = OP_MUL_ASSIGN;
             is_compound = true;
             break;
         case QTOKEN_SLASH_EQ:
-            compound_op = OP_DIV;
+            compound_op = OP_DIV_ASSIGN;
             is_compound = true;
             break;
         case QTOKEN_MOD_EQ:
-            compound_op = OP_MOD;
+            compound_op = OP_MOD_ASSIGN;
             is_compound = true;
             break;
         case QTOKEN_POW_EQ:
-            compound_op = OP_POW;
+            compound_op = OP_POW_ASSIGN;
             is_compound = true;
             break;
         case QTOKEN_FLDIV_EQ:
-            compound_op = OP_FLDIV;
+            compound_op = OP_FLDIV_ASSIGN;
             is_compound = true;
             break;
         default:
@@ -1540,7 +1585,7 @@ static ASTNode *parse_statement(void)
 
         if (is_compound)
         {
-            advance(); // consume compound token
+            advance();
             ASTNode *rhs = parse_expression();
             if (!rhs)
             {
@@ -1548,8 +1593,7 @@ static ASTNode *parse_statement(void)
                 return NULL;
             }
 
-            // Build variable node
-            ASTNode *var = make_variable(name); // make_variable duplicates name
+            ASTNode *var = make_variable(name);
             if (!var)
             {
                 free(name);
@@ -1557,7 +1601,6 @@ static ASTNode *parse_statement(void)
                 return NULL;
             }
 
-            // Build binary expression: var op rhs
             ASTNode *binary = make_binary(compound_op, var, rhs);
             if (!binary)
             {
@@ -1569,29 +1612,27 @@ static ASTNode *parse_statement(void)
 
             // Type check
             VarType var_type = symtab_lookup(name);
-            VarType expr_type = infer_type(binary);
-            if (!compatible_assignment(var_type, expr_type))
+            VarType expr_type_val = expr_type(binary);
+            if (!compatible_assignment(var_type, expr_type_val))
             {
-                fprintf(stderr, "Error: type mismatch in compound assignment to '%s' – expected %s but got %s\n",
-                        name, ctype_string(var_type), ctype_string(expr_type));
+                fprintf(stderr, "Error: type mismatch in compound assignment to '%s'\n", name);
                 parse_errors++;
                 free_ast(binary);
                 free(name);
                 return NULL;
             }
 
-            // Build assignment: name = binary
-            ASTNode *assign = make_assign(name, binary);
             free(name);
+            // Do NOT wrap in AST_ASSIGN; just emit the binary as an expression statement
             if (!expect(QTOKEN_SEMICOLON, "expected ';' after compound assignment"))
             {
-                free_ast(assign);
+                free_ast(binary);
                 return NULL;
             }
-            return assign;
+            return make_expr_statement(binary);
         }
 
-        // If not compound, must be simple assignment (expect '=')
+        // Simple assignment (expect '=')
         if (g_current.type == QTOKEN_EQUALS)
         {
             ASTNode *assign = parse_assignment(name);
@@ -1599,11 +1640,43 @@ static ASTNode *parse_statement(void)
             return assign;
         }
 
-        // Neither assignment nor compound – error
-        fprintf(stderr, "Unexpected token after identifier '%s' (expected '=' or compound assignment)\n", name);
-        parse_errors++;
+        // Postfix increment/decrement: e.g., attempts++;
+        if (g_current.type == QTOKEN_INC || g_current.type == QTOKEN_DEC)
+        {
+            UnaryOp op = (g_current.type == QTOKEN_INC) ? UNARY_POST_INC : UNARY_POST_DEC;
+            advance();
+            ASTNode *var = make_variable(name);
+            if (!var)
+            {
+                free(name);
+                return NULL;
+            }
+            ASTNode *unary = make_unary(op, var);
+            free(name);
+            if (!check_unary_types(op, var))
+            {
+                free_ast(unary);
+                return NULL;
+            }
+            if (!expect(QTOKEN_SEMICOLON, "expected ';' after expression"))
+            {
+                free_ast(unary);
+                return NULL;
+            }
+            return make_expr_statement(unary);
+        }
+
+        // Any other token: treat the identifier alone as an expression statement
+        ASTNode *var = make_variable(name);
         free(name);
-        return NULL;
+        if (!var)
+            return NULL;
+        if (!expect(QTOKEN_SEMICOLON, "expected ';' after expression"))
+        {
+            free_ast(var);
+            return NULL;
+        }
+        return make_expr_statement(var);
     }
     case QTOKEN_LBRACE:
         return parse_block();
@@ -1622,6 +1695,18 @@ static ASTNode *parse_statement(void)
     case QTOKEN_MATCH:
         return parse_match_statement();
     default:
+        if (is_expression_start(g_current.type))
+        {
+            ASTNode *expr = parse_expression();
+            if (!expr)
+                return NULL;
+            if (!expect(QTOKEN_SEMICOLON, "expected ';' after expression"))
+            {
+                free_ast(expr);
+                return NULL;
+            }
+            return make_expr_statement(expr);
+        }
         fprintf(stderr, "Parser error: unexpected token %s at start of statement\n",
                 token_name(g_current.type));
         parse_errors++;

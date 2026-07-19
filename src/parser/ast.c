@@ -359,6 +359,17 @@ void match_add_case(ASTNode *match, ASTNode *value, ASTNode *body)
     match->data.match.case_count++;
 }
 
+// for input
+ASTNode *make_input(ASTNode *prompt)
+{
+    ASTNode *node = (ASTNode *)malloc(sizeof(ASTNode));
+    if (!node)
+        return NULL;
+    node->type = AST_INPUT;
+    node->data.prompt = prompt;
+    return node;
+}
+
 void free_ast(ASTNode *node)
 {
     if (!node)
@@ -450,6 +461,9 @@ void free_ast(ASTNode *node)
             free_ast(node->data.multilet.declarations[i]);
         }
         free(node->data.multilet.declarations);
+        break;
+    case AST_INPUT:
+        free_ast(node->data.prompt);
         break;
     default:
         break;
