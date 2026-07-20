@@ -25,6 +25,7 @@ static ASTNode *parse_continue_statement(void);
 static ASTNode *parse_match_statement(void);
 static ASTNode *parse_statement_list_until(const QTokenType terminals[], int n);
 static ASTNode *parse_single_let(void);
+static ASTNode *parse_return_statement(void);
 
 static VarType expr_type(ASTNode *node);
 static int parse_errors = 0;
@@ -364,6 +365,8 @@ const char *token_name(QTokenType type)
         return "'to_char'";
     case QTOKEN_TO_BOOL:
         return "'to_bool'";
+    case QTOKEN_RETURN:
+        return "'return'";
     default:
         return "???";
     }
@@ -533,6 +536,28 @@ static ASTNode *parse_continue_statement(void)
     if (!expect(QTOKEN_SEMICOLON, "expected ';' after 'continue'"))
         return NULL;
     return make_continue();
+}
+
+static ASTNode *parse_return_statement(void)
+{
+    advance(); // consume 'return'
+
+    // Optional expression
+    ASTNode *expr = NULL;
+    if (g_current.type != QTOKEN_SEMICOLON)
+    {
+        expr = parse_expression();
+        if (!expr)
+            return NULL;
+    }
+
+    if (!expect(QTOKEN_SEMICOLON, "expected ';' after return"))
+    {
+        free_ast(expr);
+        return NULL;
+    }
+
+    return make_return(expr);
 }
 
 static ASTNode *parse_postfix(void)
@@ -1775,6 +1800,8 @@ static ASTNode *parse_statement(void)
         return parse_continue_statement();
     case QTOKEN_MATCH:
         return parse_match_statement();
+    case QTOKEN_RETURN:
+        return parse_return_statement();
     default:
         if (is_expression_start(g_current.type))
         {

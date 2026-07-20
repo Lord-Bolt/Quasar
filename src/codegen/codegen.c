@@ -235,7 +235,7 @@ void generate_code(ASTNode *program, FILE *out)
         emit_statement(program->data.program.statements[i], out, 1);
     }
 
-    fprintf(out, "    return 0;\n");
+    fprintf(out, "\treturn 0;\n");
     fprintf(out, "}\n");
 }
 
@@ -466,6 +466,20 @@ static void emit_statement(ASTNode *node, FILE *out, int indent_level)
         indent(out, indent_level);
         emit_expression(node->data.expr, out);
         fprintf(out, ";\n");
+        break;
+
+    case AST_RETURN:
+        indent(out, indent_level);
+        if (node->data.return_expr)
+        {
+            fprintf(out, "return ");
+            emit_expression(node->data.return_expr, out);
+            fprintf(out, ";\n");
+        }
+        else
+        {
+            fprintf(out, "return;\n");
+        }
         break;
 
     default:

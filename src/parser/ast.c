@@ -382,6 +382,17 @@ ASTNode *make_type_conv(VarType target, ASTNode *source)
     return node;
 }
 
+// for return
+ASTNode *make_return(ASTNode *expr)
+{
+    ASTNode *node = (ASTNode *)malloc(sizeof(ASTNode));
+    if (!node)
+        return NULL;
+    node->type = AST_RETURN;
+    node->data.return_expr = expr;
+    return node;
+}
+
 void free_ast(ASTNode *node)
 {
     if (!node)
@@ -479,6 +490,9 @@ void free_ast(ASTNode *node)
         break;
     case AST_TYPE_CONV:
         free_ast(node->data.typeconv.source);
+        break;
+    case AST_RETURN:
+        free_ast(node->data.return_expr);
         break;
     default:
         break;
